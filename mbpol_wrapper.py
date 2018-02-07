@@ -1,6 +1,7 @@
 from ase import Atoms
 from ase.optimize import BFGS
 from ase.md.npt import NPT
+from ase.md import VelocityVerlet
 from ase.calculators.nwchem import NWChem
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.io import write
@@ -14,7 +15,8 @@ from ase import units as ase_units
 from ase.io import Trajectory
 from ase.io import write
 from ase.io import read
-
+import pandas as pd
+import time
 eVtokcal = 23.06035
 kcaltoeV = 1/eVtokcal
 
@@ -98,7 +100,7 @@ def reconnect_monomers(atoms, boxsize):
     for i,_ in enumerate(atoms.get_positions()[::3]):
         
         if atoms.get_distance(i*3,i*3+1) > min(boxsize) - 5:
-            d = h2o.positions[i*3] - atoms.positions[i*3+1]
+            d = atoms.positions[i*3] - atoms.positions[i*3+1]
             which = np.where(np.abs(d) > 5)[0]
             for w in which:
                 pos0[i*3+1, w] += d[w]/np.abs(d[w]) * boxsize[w]
@@ -113,38 +115,3 @@ def reconnect_monomers(atoms, boxsize):
     return atoms
 
 
-if __name__ == '__main__':
-    
-    if len(sys.argv) == 2:
-        ttime = sys.argv[1]
-    else:
-        ttime = 25
-
-    pdb = app.PDBFile("../ase/128.pdb")
-    init_pos = np.array(pdb.positions.value_in_unit(unit.angstrom))
-    init_pos = np.delete(init_pos, np.arange(3,len(init_pos),4), axis = 0)
-
-    a = 15.646 
-    boxsize = [a,a,a] * unit.angstrom
-
-    h2o = Atoms('128OHH',
-                positions = init_pos,
-                cell = [a, a, a],
-                pbc = True)
-
-
-    h2o_shifted = reconnect_monomers(h2o,[a,a,a])
-
-    h2o.calc = MbpolCalculator(pdb, app.PME, boxSize = boxsize, nonbondedCutoff= 0.7*unit.nanometer, tip4p = False)
-
-    MaxwellBoltzmannDistribution(h2o, 300 * ase_units.kB)
-
-    h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
-
-    dyn = NPT(h2o, timestep = 1.0 * ase_units.fs, temperature =  300 * ase_units.kB, externalstress = 0,
-                  ttime = ttime * ase_units.fs, pfactor = None,
-                         trajectory='md_128_{}.traj'.format(ttime), logfile='md_128_{}.log'.format(ttime))
-    dyn.run(500) 
-
-    traj = Trajectory('./md_128_{}.traj'.format(ttime))
-    write('md_128.xyz', traj)
