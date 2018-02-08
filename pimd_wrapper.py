@@ -14,10 +14,10 @@ import pandas as pd
 import time
 import hashlib
 import shutil
+import os
 eVtokcal = 23.06035
 kcaltoeV = 1/eVtokcal
 
-kilocalorie_per_mole_per_angstrom = unit.kilocalorie_per_mole/unit.angstrom
 
 class PIMDPropagator:
       
@@ -26,18 +26,28 @@ class PIMDPropagator:
              thermostat='none', tau=0.01, 
              temperature=300):
         
-        self.filename = hashlib.md5(str(time.time()).encode()).hexdigest()                 
+        self.filename = '.' + hashlib.md5(str(time.time()).encode()).hexdigest()                 
         self.atoms = atoms
         self.steps = steps
         self.dt = dt
-        self.output_freq = output_freq
+        if output_freq == -1:
+            self.output_freq = steps
+        else:
+            self.output_freq = output_freq
         self.thermostat = thermostat  
         self.tau = tau
         self.temperature = temperature      
+
         self._update_input_file()         
+        self._update_xyz_file()
+        
+#    def __del__(self):
+#        os.remove(self.filename + '.inp')
+#        os.remove(self.filename + '.xyz')
 
     def _update_xyz_file(self):
-        pass
+        write(self.filename + '.xyz', self.atoms)
+
     def _update_input_file(self):
         with open('.pimd_input.template','r') as inputfile:
             input_template = inputfile.read()
@@ -66,8 +76,7 @@ class PIMDPropagator:
     
     def get_potential_energy(self, atoms, force_consistent = False):
         pass 
-    
-    
+
     def set_atoms(self, atoms):
         self.atoms = atoms
 
@@ -76,8 +85,14 @@ class PIMDPropagator:
 
     def propagate(self):
         pass            
+
     def get_stress(self, atoms):
         return np.zeros([3,3])
         raise Exception('Not implemented')
 
+if __name__ == '__main__':
+    h2o = read('128.xyz')
+    h2o.set_cell([[15.646,0,0],[0,15.646,0],[0,0,15.646]])
+    h2o.set_pbc(True)
+    prop = PIMDPropagator(h2o)
 
