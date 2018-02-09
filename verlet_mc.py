@@ -9,8 +9,6 @@ from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.io import read,write, Trajectory
 from ase import units as ase_units
 from ase.md import logger
-from simtk.openmm import app
-from simtk import unit
 import argparse
 import shutil
 
@@ -46,22 +44,17 @@ file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt)
 
 # Load initial configuration 
 
-pdb = app.PDBFile("./128.pdb")
-init_pos = np.array(pdb.positions.value_in_unit(unit.angstrom))
-init_pos = np.delete(init_pos, np.arange(3,len(init_pos),4), axis = 0)
-
 a = 15.646 
 boxsize = [a,a,a] * unit.angstrom
 
 h2o = Atoms('128OHH',
-            positions = init_pos,
+            positions = np.genfromtxt('128.csv',delimiter = ','),
             cell = [a, a, a],
             pbc = True)
 
-h2o_shifted = mbp.reconnect_monomers(h2o,[a,a,a])
+h2o_shifted = mbp.reconnect_monomers(h2o)
 
-h2o.calc = mbp.MbpolCalculator(pdb, app.PME, boxSize = boxsize,
-     nonbondedCutoff= 0.75*unit.nanometer, tip4p = False)
+h2o.calc = mbp.MbpolCalculator(h2o)
 
 def shuffle_momenta(h2o):
     MaxwellBoltzmannDistribution(h2o, args.T * ase_units.kB)

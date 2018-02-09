@@ -21,28 +21,6 @@ kcaltoeV = 1/eVtokcal
 
 #TODO: also intialize velocities (or make it an option), read coordinates/veloctities and return them 
 
-def reconnect_monomers(atoms):
-    boxsize = np.diag(atoms.get_cell())
-    pos0 = np.array(atoms.positions)
-
-    for i,_ in enumerate(atoms.get_positions()[::3]):
-
-        if atoms.get_distance(i*3,i*3+1) > min(boxsize) - 5:
-            d = atoms.positions[i*3] - atoms.positions[i*3+1]
-            which = np.where(np.abs(d) > 5)[0]
-            for w in which:
-                pos0[i*3+1, w] += d[w]/np.abs(d[w]) * boxsize[w]
-        elif atoms.get_distance(i*3,i*3+2) > min(boxsize) -5:
-            d = atoms.positions[i*3] - atoms.positions[i*3+2]
-            which = np.where(np.abs(d) > 5)[0]
-            for w in which:
-                pos0[i*3+2, w] += d[w]/np.abs(d[w]) * boxsize[w]
-
-    atoms.set_positions(pos0)
-
-    return atoms
-
-
 class PIMDPropagator:
       
     def __init__(self, atoms, steps=10,
@@ -101,14 +79,11 @@ class PIMDPropagator:
     def calculation_required(self, atoms, quantities):
         return True
     
-    def is_calculated(self, atoms):
-        return (not np.all(self.last_coordinates == atoms.positions))
-    
     def get_forces(self, atoms):
-        pass 
+        raise Exception('Not implemented') 
     
     def get_potential_energy(self, atoms, force_consistent = False):
-        pass 
+        raise Exception('Not implemented') 
 
     def set_atoms(self, atoms):
         self.atoms = atoms
@@ -120,21 +95,26 @@ class PIMDPropagator:
     def propagate(self):
         cmd = ['PIMD.x ' + self.filename +'.inp']
         subprocess.check_call(cmd, shell = True)
-        new_atoms = read('out_' + self.filename + '_coord.xyz')
+        new_atoms = read('out_' + self.filename + '_coord.xyz', index = -1)
         self.atoms.set_positions(new_atoms.get_positions())     
-        subprocess.check_call(['rm out_.*'], shell = True)                
+        self.atoms.set_velocities(read('out_' + \
+             self.filename + '_momenta.dat', format='xyz',
+             index = -1).get_positions())
+    #    subprocess.check_call(['rm out_.*'], shell = True)                
         return self.atoms
     
     def get_stress(self, atoms):
         return np.zeros([3,3])
         raise Exception('Not implemented')
 
+   
 if __name__ == '__main__':
     h2o = read('128.xyz')
     h2o_old = Atoms(h2o)
     h2o.set_cell([[15.646,0,0],[0,15.646,0],[0,0,15.646]])
     h2o.set_pbc(True)
-#    reconnect_monomers(h2o)
-    prop = PIMDPropagator(h2o, output_freq=1)
+ #   reconnect_monomers(h2o)
+    prop = PIMDPropagator(h2o, steps = 10, output_freq = 1)
     prop.propagate()
-    print(h2o_old.get_positions() - h2o.get_positions())
+    print(h2o.get_temperature())
+    print(h2o.get_velocities())

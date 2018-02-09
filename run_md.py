@@ -1,15 +1,9 @@
 from ase import Atoms
-from ase.optimize import BFGS
 from ase.md.npt import NPT
 from ase.md import VelocityVerlet
-from ase.calculators.nwchem import NWChem
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.io import write
-from simtk.openmm import app
-import simtk.openmm as mm
-from simtk import unit
 import sys
-import mbpol
 import numpy as np
 from ase import units as ase_units
 from ase.io import Trajectory
@@ -17,12 +11,11 @@ from ase.io import write
 from ase.io import read
 import pandas as pd
 import time
-from mbpol_wrapper import *
+sys.path.append('/home/sebastian/Documents/Code/mbpol_calculator')
+print(sys.path)
+from mbpol_calculator import *
 eVtokcal = 23.06035
 kcaltoeV = 1/eVtokcal
-
-
-kilocalorie_per_mole_per_angstrom = unit.kilocalorie_per_mole/unit.angstrom
 
 if __name__ == '__main__':
     
@@ -32,28 +25,24 @@ if __name__ == '__main__':
     else:
         ttime = 10.0
 
-    pdb = app.PDBFile("./128.pdb")
-    init_pos = np.array(pdb.positions.value_in_unit(unit.angstrom))
-    init_pos = np.delete(init_pos, np.arange(3,len(init_pos),4), axis = 0)
-
+    
     a = 15.646 
     boxsize = [a,a,a] * unit.angstrom
 
     h2o = Atoms('128OHH',
-                positions = init_pos,
+                positions = np.genfromtxt('128.csv',delimiter = ','),
                 cell = [a, a, a],
                 pbc = True)
 
 
-    h2o_shifted = reconnect_monomers(h2o,[a,a,a])
+    h2o_shifted = reconnect_monomers(h2o)
 
-    h2o.calc = MbpolCalculator(pdb, app.PME, boxSize = boxsize,
-         nonbondedCutoff= 0.75*unit.nanometer, tip4p = False)
+    h2o.calc = MbpolCalculator(h2o)
     
     MaxwellBoltzmannDistribution(h2o, 300 * ase_units.kB)
 
-#    while(abs(h2o.get_temperature() - 200) > 10):
-#        MaxwellBoltzmannDistribution(h2o, 300 * ase_units.kB)
+    while(abs(h2o.get_temperature() - 300) > 1):
+        MaxwellBoltzmannDistribution(h2o, 300 * ase_units.kB)
     print('ttime= {} fs :: temperature = {}'.format(ttime,h2o.get_temperature()))
  
     h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))

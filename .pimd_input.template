@@ -11,7 +11,7 @@ PAR_time_step                  	 ! timestep (delt) (fs)
 
 OUTPUT OPTIONS
 .t.                      ! centroid coordinates
-.f.                      ! centroid momenta
+.t.                      ! centroid momenta
 .f.                      ! dipoles
 .f.                      ! polarization dipoles
 .f.                      ! total dipole
@@ -34,7 +34,7 @@ MD OPTIONS
 7d0 5d0 1.d-6           ! realspace cutoff (Ang), start of VdW force switch (Ang) (TTM3F only), eps for aewald
 15  0.7  1.d-6 .f.  .f. ! params for dipole iterative procedure: Max iterations, pol factor, accuracy, guess initial?, debug output
 .t.					 	! generate initial velocities?
-.t.    			 		! Global thermostat? t/f
+.f.    			 		! Global thermostat? t/f
 .f.      				! Thermostat non-centroid modes ?
 .f.			 			! Thermostat centroid mode ?
 PAR_thermostat     			! type of bead thermostat - 'Nose-Hoover', 'Langevin' or 'none'
