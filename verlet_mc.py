@@ -1,7 +1,7 @@
 import numpy as np
 import sys
-sys.path.append('../')
-import mbpol_wrapper as mbp
+sys.path.append('~/Documents/Physics/Code/mbpol_calculator')
+import mbpol_calculator as mbp
 from ase import Atoms
 from ase.md.npt import NPT
 from ase.md import VelocityVerlet
@@ -11,7 +11,7 @@ from ase import units as ase_units
 from ase.md import logger
 import argparse
 import shutil
-
+import pimd_wrapper as pimd
 
 # Parse Command line
 
@@ -45,15 +45,13 @@ file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt)
 # Load initial configuration 
 
 a = 15.646 
-boxsize = [a,a,a] * unit.angstrom
 
 h2o = Atoms('128OHH',
             positions = np.genfromtxt('128.csv',delimiter = ','),
             cell = [a, a, a],
             pbc = True)
 
-h2o_shifted = mbp.reconnect_monomers(h2o)
-
+mbp.reconnect_monomers(h2o)
 h2o.calc = mbp.MbpolCalculator(h2o)
 
 def shuffle_momenta(h2o):
@@ -64,6 +62,8 @@ def shuffle_momenta(h2o):
 shuffle_momenta(h2o)
 
 dyn = VelocityVerlet(h2o, args.dt * ase_units.fs)
+
+prop = pimd.PIMDPropagator(h2o, steps = args.Nt, output_freq = 1)
 
 
 positions = []
@@ -79,7 +79,9 @@ my_log = logger.MDLogger(dyn, h2o,args.dir + 'verlet' + file_extension + '_keepv
 
 for i in range(args.Nmax):
     
-    dyn.run(args.Nt) 
+#    dyn.run(args.Nt)
+    prop.set_atoms(h2o) 
+    prop.propagate()
     E1 = h2o.get_total_energy()
     de = E1 - E0
     if de <= 0:

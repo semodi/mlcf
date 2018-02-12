@@ -33,7 +33,7 @@ MD OPTIONS
 'siesta','h2o', 1 			    ! sys_label for SIESTA runs, # SIESTA processors
 7d0 5d0 1.d-6           ! realspace cutoff (Ang), start of VdW force switch (Ang) (TTM3F only), eps for aewald
 15  0.7  1.d-6 .f.  .f. ! params for dipole iterative procedure: Max iterations, pol factor, accuracy, guess initial?, debug output
-.t.					 	! generate initial velocities?
+.f.					 	! generate initial velocities?
 .f.    			 		! Global thermostat? t/f
 .f.      				! Thermostat non-centroid modes ?
 .f.			 			! Thermostat centroid mode ?
@@ -54,4 +54,4 @@ full		 ! type of PIMD run - "full", "contracted", "monomerPIMD"
 1		 ! ratio of slow timestep / fast timestep for contraction scheme
 15.994		 ! mass of Oxygen (au)
 1.008		 ! mass of Hyrdrogen
-.f.      ! restart? (append to previous files)
+.t.      ! restart? (append to previous files)
