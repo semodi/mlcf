@@ -1,4 +1,3 @@
-*.ipynb
 workdir/
-*/
+__pycache__/
 *.swp
