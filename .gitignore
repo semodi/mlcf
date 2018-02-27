@@ -1,3 +1,4 @@
 workdir/
 __pycache__/
 *.swp
+siesta/
