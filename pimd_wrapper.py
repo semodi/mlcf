@@ -16,10 +16,10 @@ import hashlib
 import shutil
 import os
 import subprocess
+from mbpol_calculator import reconnect_monomers
 eVtokcal = 23.06035
 kcaltoeV = 1/eVtokcal
 
-#TODO: also intialize velocities (or make it an option), read coordinates/veloctities and return them 
 
 class PIMDPropagator:
       
@@ -31,7 +31,7 @@ class PIMDPropagator:
         self.filename = '.' + hashlib.md5(str(time.time()).encode()).hexdigest()                 
 #        self.filename = '.tempfilename'
         self.atoms = atoms
-        reconnect_monomers(self.atoms)
+        self.atoms.set_positions(self.atoms.get_positions(True))
         self.steps = steps
         self.dt = dt
         if output_freq == -1:
@@ -98,7 +98,10 @@ class PIMDPropagator:
         cmd = ['PIMD.x ' + self.filename +'.inp']
         subprocess.check_call(cmd, shell = True)
         new_atoms = read('out_' + self.filename + '_coord.xyz', index = -1)
-        self.atoms.set_positions(new_atoms.get_positions())     
+        self.atoms.set_positions(new_atoms.get_positions())
+        reconnect_monomers(self.atoms)     
+        reconnect_monomers(self.atoms)     
+        reconnect_monomers(self.atoms)     
         self.atoms.set_momenta(read('out_' + \
              self.filename + '_momenta.dat', format='xyz',
              index = -1).get_positions()/(98.22695))
@@ -109,29 +112,6 @@ class PIMDPropagator:
         return np.zeros([3,3])
         raise Exception('Not implemented')
 
-def reconnect_monomers(atoms):
-    """ Reconnect Hydrogen and Oxygen that are split across unit cell
-        boundaries and are therefore situated on opposite ends of the unit
-        cell
-    """
-    boxsize = np.diag(atoms.get_cell())
-    pos0 = np.array(atoms.get_positions(True))
-
-    for i,_ in enumerate(atoms.get_positions()[::3]):
-
-        if atoms.get_distance(i*3,i*3+1) > 1.5:
-            d = atoms.positions[i*3] - atoms.positions[i*3+1]
-            which = np.where(np.abs(d) > 5)[0]
-            for w in which:
-                pos0[i*3+1, w] += d[w]/np.abs(d[w]) * boxsize[w]
-        elif atoms.get_distance(i*3,i*3+2) > 1.5:
-            d = atoms.positions[i*3] - atoms.positions[i*3+2]
-            which = np.where(np.abs(d) > 5)[0]
-            for w in which:
-                pos0[i*3+2, w] += d[w]/np.abs(d[w]) * boxsize[w]
-    
-    atoms.set_positions(pos0)
-    return atoms
  
 if __name__ == '__main__':
     h2o = read('128.xyz')

@@ -3,6 +3,8 @@ from ase.calculators.siesta import Siesta
 from ase.calculators.siesta.parameters import Species, PAOBasisBlock
 from ase.units import Ry
 
+import os
+os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 siesta < ./%s > ./%s'
 
 basis_sets = {'o_basis_qz' : """ 3
 n=2 0 4 E 50. 7.5
@@ -40,7 +42,7 @@ n=2   1   1   E    24.56504     2.20231
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH'):
-
+        os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf'
         species_o = Species(symbol= 'O',
          basis_set= PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
         species_h = Species(symbol= 'H',

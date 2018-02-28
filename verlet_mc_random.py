@@ -49,9 +49,9 @@ else:
     raise Exception('Restart argument not understood, choose "y" or "n"')
 
 if args.noise > 0.0:
-    file_extension = '{}_{}_{}_{}_{}'.format(int(args.T), int(args.dt*1000), int(args.Nt), int(args.Nmax), int(args.noise*1000))
+    file_extension = '{}_{}_{}_{}_{}_random'.format(int(args.T), int(args.dt*1000), int(args.Nt), int(args.Nmax), int(args.noise*1000))
 else:
-    file_extension = '{}_{}_{}_{}'.format(int(args.T), int(args.dt*1000), int(args.Nt), int(args.Nmax))
+    file_extension = '{}_{}_{}_{}_random'.format(int(args.T), int(args.dt*1000), int(args.Nt), int(args.Nmax))
 
 # Load initial configuration 
 
@@ -70,6 +70,7 @@ if args.restart:
 else:
     print('new simulation')
 
+h2o.set_positions(read(args.dir + 'cp_analyze/verlet_mc' + file_extension[:-7] + '.traj',index = -1).get_positions())
 #########
 #h2o.set_positions(read('/gpfs/scratch/smdick/mbpol/bckp/verlet_mc298_1000_5_100000.traj',index = -1).get_positions())
 #########
@@ -127,7 +128,8 @@ for i in range(args.Nmax):
     de = E1 - E0
 #    print("E1 = {} :: E0 = {} :: de = {}".format(E1,E0,de) )
 #    steps_file.write("E1 = {} :: E0 = {} :: de = {}".format(E1,E0,de))
-    if de <= 0:
+    rand_n = np.random.randn(1)
+    if rand_n > -0.3:
         pos1 = h2o.get_positions()
         positions.append(pos1)
         pos0 = np.array(pos1)
@@ -138,22 +140,10 @@ for i in range(args.Nmax):
 #        steps_file.write("  :: accepted")
         print('accepted')
     else:
-        if rands[i] < np.exp(-de/temperature):
-            pos1 = h2o.get_positions()
-            positions.append(pos1)
-            pos0 = np.array(pos1)
-            trajectory.write(h2o)
-            my_log()
-#            shuffle_momenta(h2o)
-            
-            E0 = h2o.get_total_energy() 
-#            steps_file.write("  :: accepted")
-            print('accepted')
-        else:
-            h2o.set_positions(pos0)
-            shuffle_momenta(h2o)
-            E0 = h2o.get_total_energy() 
+        h2o.set_positions(pos0)
+        shuffle_momenta(h2o)
+        E0 = h2o.get_total_energy() 
 #            steps_file.write("  :: rejected")
-            print('rejected')
-            continue
+        print('rejected')
+        continue
 #steps_file.close()

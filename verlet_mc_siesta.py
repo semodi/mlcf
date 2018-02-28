@@ -38,32 +38,42 @@ print('Use functional ' + args.xc)
 print('Use basis ' + args.basis)
 print('\n===========================================\n')
 
-try:
-    shutil.os.mkdir(args.dir)
-except FileExistsError:
-    pass
-
-
 file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt),int(args.Nmax))
 
 # Load initial configuration
 
 a = 15.646
 
-h2o = Atoms('128OHH',
-            positions = np.genfromtxt('128.csv',delimiter = ','),
+#h2o = Atoms('128OHH',
+#            positions = np.genfromtxt('128.csv',delimiter = ','),
+#            cell = [a, a, a],
+#            pbc = True)
+#h2o_siesta = Atoms('128OHH',
+#            positions = np.genfromtxt('128.csv',delimiter = ','),
+#            cell = [a, a, a],
+#            pbc = True)
+
+h2o = Atoms('32OHH',
+            positions = np.genfromtxt('128.csv',delimiter = ',')[:32*3],
             cell = [a, a, a],
             pbc = True)
-h2o_siesta = Atoms('128OHH',
-            positions = np.genfromtxt('128.csv',delimiter = ','),
+h2o_siesta = Atoms('32OHH',
+            positions = np.genfromtxt('128.csv',delimiter = ',')[:32*3],
             cell = [a, a, a],
             pbc = True)
+
 
 try:
     os.chdir('./siesta/')
 except FileNotFoundError:
     os.mkdir('./siesta/')
     os.chdir('./siesta/')
+
+try:
+    shutil.os.mkdir(args.dir)
+except FileExistsError:
+    pass
+
 
 mbp.reconnect_monomers(h2o)
 
@@ -122,6 +132,10 @@ for i in range(args.Nmax):
 #            shuffle_momenta(h2o)
             E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
         else:
+## JUST FOR DOUBLE CHECKING
+            trajectory.write(h2o)
+            my_log()
+####
             h2o.set_positions(pos0)
             h2o_siesta.set_positions(pos0)
             shuffle_momenta(h2o)

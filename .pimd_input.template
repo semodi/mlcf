@@ -29,7 +29,7 @@ PAR_output_freq    					 ! all images output frequency
 PAR_output_freq       				 ! Output frequency for everything else
 
 MD OPTIONS
-3                    ! Model: 2=ttm21f 3=ttm3f 4= qspcfw 5=spcf 6=SIESTA
+2                    ! Model: 2=ttm21f 3=ttm3f 4= qspcfw 5=spcf 6=SIESTA
 'siesta','h2o', 1 			    ! sys_label for SIESTA runs, # SIESTA processors
 7d0 5d0 1.d-6           ! realspace cutoff (Ang), start of VdW force switch (Ang) (TTM3F only), eps for aewald
 15  0.7  1.d-6 .f.  .f. ! params for dipole iterative procedure: Max iterations, pol factor, accuracy, guess initial?, debug output
