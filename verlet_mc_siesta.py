@@ -23,10 +23,12 @@ parser.add_argument('-dt', metavar='dt', type=float, nargs = '?', default=1.0, h
 parser.add_argument('-Nt', metavar='Nt', type=int, nargs = '?', default=10, help='Number of timesteps between MC')
 parser.add_argument('-Nmax', metavar='Nmax', type=int, nargs = '?', default=1000, help='Max. number of MC steps')
 parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./verlet_mc_results/', help='Save in directory')
-parser.add_argument('-xc', metavar='xc', type=str, nargs = '?', default='BH', help='Which XC functional?')
-parser.add_argument('-basis', metavar='basis', type=str, nargs= '?', default='qz', help='Basis: qz or dz')
+parser.add_argument('-xc', metavar='xc', type=str, nargs = '?', default='pbe', help='Which XC functional?')
+parser.add_argument('-basis', metavar='basis', type=str, nargs= '?', default='dz', help='Basis: qz or dz')
 
 args = parser.parse_args()
+args.xc = args.xc.upper()
+args.basis = args.basis.lower()
 
 print('\n============ Starting calculation ========== \n \n')
 print('Temperature = {} K'.format(args.T))
@@ -43,7 +45,7 @@ file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt)
 # Load initial configuration
 
 a = 15.646
-
+b = 13.0
 #h2o = Atoms('128OHH',
 #            positions = np.genfromtxt('128.csv',delimiter = ','),
 #            cell = [a, a, a],
@@ -53,13 +55,13 @@ a = 15.646
 #            cell = [a, a, a],
 #            pbc = True)
 
-h2o = Atoms('32OHH',
-            positions = np.genfromtxt('128.csv',delimiter = ',')[:32*3],
-            cell = [a, a, a],
+h2o = Atoms('64OHH',
+            positions = read('64.xyz').get_positions(),
+            cell = [b, b, b],
             pbc = True)
-h2o_siesta = Atoms('32OHH',
-            positions = np.genfromtxt('128.csv',delimiter = ',')[:32*3],
-            cell = [a, a, a],
+h2o_siesta = Atoms('64OHH',
+            positions = read('64.xyz').get_positions(),
+            cell = [b, b, b],
             pbc = True)
 
 
@@ -89,8 +91,6 @@ shuffle_momenta(h2o)
 
 dyn = VelocityVerlet(h2o, args.dt * ase_units.fs)
 
-#prop = pimd.PIMDPropagator(h2o, steps = args.Nt, output_freq = 1)
-
 
 positions = []
 
@@ -103,12 +103,13 @@ temperature = args.T * ase_units.kB
 trajectory = Trajectory(args.dir + 'verlet' + file_extension + '_keepv_dc.traj', 'a')
 my_log = logger.MDLogger(dyn, h2o,args.dir + 'verlet' + file_extension + '_keepv_dc.log')
 
+tarjectory.write(h2o)
+my_log()
+
 for i in range(args.Nmax):
     print('Propagating...')
     dyn.run(args.Nt)
     print('Propagating done. Calculating new energies...')
-#   prop.set_atoms(h2o)
-#   prop.propagate()
     h2o_siesta.set_positions(h2o.get_positions())
     E1 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
     de = E1 - E0
