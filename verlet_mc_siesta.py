@@ -1,6 +1,5 @@
+from siestah2o import SiestaH2O
 import numpy as np
-import sys
-sys.path.append('~/Documents/Physics/Code/mbpol_calculator')
 import mbpol_calculator as mbp
 from ase import Atoms
 from ase.md.npt import NPT
@@ -12,7 +11,6 @@ from ase.md import logger
 import argparse
 import shutil
 import pimd_wrapper as pimd
-from siestah2o import SiestaH2O
 import os
 
 # Parse Command line
@@ -94,24 +92,31 @@ dyn = VelocityVerlet(h2o, args.dt * ase_units.fs)
 
 positions = []
 
+#dyn.run(args.Nt * 5) 
+h2o_siesta.set_positions(h2o.get_positions())
+
 E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
 pos0 = h2o.get_positions()
+E0pot = h2o_siesta.get_potential_energy()
 
 rands = np.random.rand(args.Nmax)
 temperature = args.T * ase_units.kB
 
 trajectory = Trajectory(args.dir + 'verlet' + file_extension + '_keepv_dc.traj', 'a')
-my_log = logger.MDLogger(dyn, h2o,args.dir + 'verlet' + file_extension + '_keepv_dc.log')
+my_log = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.log')
+my_log_all = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.all.log')
 
-tarjectory.write(h2o)
+trajectory.write(h2o)
+
 my_log()
-
+my_log_all()
 for i in range(args.Nmax):
     print('Propagating...')
     dyn.run(args.Nt)
     print('Propagating done. Calculating new energies...')
     h2o_siesta.set_positions(h2o.get_positions())
     E1 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
+    my_log_all()
     de = E1 - E0
     print('Energy difference: {} eV'.format(de))
 
@@ -123,6 +128,7 @@ for i in range(args.Nmax):
         my_log()
 #        shuffle_momenta(h2o)
         E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
+        E0pot = h2o_siesta.get_potential_energy()
     else:
         if rands[i] < np.exp(-de/temperature):
             pos1 = h2o.get_positions()
@@ -132,13 +138,10 @@ for i in range(args.Nmax):
             my_log()
 #            shuffle_momenta(h2o)
             E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
+            E0pot = h2o_siesta.get_potential_energy()
         else:
-## JUST FOR DOUBLE CHECKING
-            trajectory.write(h2o)
-            my_log()
-####
             h2o.set_positions(pos0)
             h2o_siesta.set_positions(pos0)
             shuffle_momenta(h2o)
-            E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
+            E0 = h2o.get_kinetic_energy() + E0pot
             continue

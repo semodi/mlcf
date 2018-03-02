@@ -1,11 +1,23 @@
-from ase import Atoms
-from ase.calculators.siesta import Siesta
-from ase.calculators.siesta.parameters import Species, PAOBasisBlock
-from ase.units import Ry
+
 
 import os
+import tensorflow as tf
+from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS
+from xcml import load_network
+from ase.calculators.siesta import Siesta
+from ase.calculators.siesta.parameters import Species, PAOBasisBlock
+from ase import Atoms
+from ase.units import Ry
+from siesta_utils.mat import import_matrix
+import time 
+import numpy as np 
+
 #os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 siesta < ./%s > ./%s'
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+os.environ['QT_QPA_PLATFORM']='offscreen'
+nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_dz/'
+
+offset_nn = (-469.766523)
 
 basis_sets = {'o_basis_qz' : """ 3
 n=2 0 4 E 50. 7.5
@@ -43,7 +55,7 @@ n=2   1   1   E    24.56504     2.20231
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH'):
-        os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+        os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
         species_o = Species(symbol= 'O',
          basis_set= PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
         species_h = Species(symbol= 'H',
@@ -57,5 +69,28 @@ class SiestaH2O(Siesta):
                fdf_arguments={'DM.MixingWeight': 0.3,
                               'MaxSCFIterations': 50,
                               'DM.NumberPulay': 3,
-                              'DM.Tolerance': 1e-4,
-                              'ElectronicTemperature': 5e-3})
+                              'DM.Tolerance': 1e-1,
+                              'ElectronicTemperature': 5e-3,
+                              'WriteMullikenPop': 1,
+                              'DM.FormattedFiles': 'True'})
+        self.nn_model = load_network(nn_path)
+        
+    def get_potential_energy(self, atoms, force_consistent = False):
+        #TODO: Fix all magic numbers !!!
+        n_mol = int(len(atoms)/3)
+        pot_energy = super().get_potential_energy(atoms)
+        D = import_matrix('H2O.DMF')
+        S = import_matrix('H2O.S_custom')
+        DMS = D.dot(S.T)
+        basis = find_basis("H2O.out")
+        with open('ML_TIMES','a') as time_log:
+
+            start = time.time()
+            M = getM_from_DMS(DMS, atoms.get_positions(),
+                 n_mol, basis)
+            end = time.time()
+            time_log.write('Time to rotate M: {} s'.format(start-end))    
+        correction = use_model(M.reshape(1,-1), n_mol,
+             nn=self.nn_model, n_o_orb=13, n_h_orb=5)  
+        
+        return pot_energy - correction - n_mol * offset_nn
