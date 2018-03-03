@@ -104,12 +104,14 @@ temperature = args.T * ase_units.kB
 
 trajectory = Trajectory(args.dir + 'verlet' + file_extension + '_keepv_dc.traj', 'a')
 my_log = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.log')
+mbpol_log = logger.MDLogger(dyn, h2o, args.dir + 'verlet' + file_extension + '_keepv_dc.mbpol.log')
 my_log_all = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.all.log')
 
 trajectory.write(h2o)
 
 my_log()
 my_log_all()
+mbpol_log()
 for i in range(args.Nmax):
     print('Propagating...')
     dyn.run(args.Nt)
@@ -117,6 +119,7 @@ for i in range(args.Nmax):
     h2o_siesta.set_positions(h2o.get_positions())
     E1 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
     my_log_all()
+    mbpol_log()
     de = E1 - E0
     print('Energy difference: {} eV'.format(de))
 

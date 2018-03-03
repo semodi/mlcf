@@ -4,7 +4,7 @@ import os
 import tensorflow as tf
 from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS
 from xcml import load_network
-from ase.calculators.siesta import Siesta
+from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 from ase.calculators.siesta.parameters import Species, PAOBasisBlock
 from ase import Atoms
 from ase.units import Ry
@@ -12,8 +12,8 @@ from siesta_utils.mat import import_matrix
 import time 
 import numpy as np 
 
-#os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 siesta < ./%s > ./%s'
-os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 siesta < ./%s > ./%s'
+#os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
 os.environ['QT_QPA_PLATFORM']='offscreen'
 nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_dz/'
 
