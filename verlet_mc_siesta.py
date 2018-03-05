@@ -12,6 +12,19 @@ import argparse
 import shutil
 import pimd_wrapper as pimd
 import os
+import ipyparallel as ipp
+
+os.environ['QT_QPA_PLATFORM']='offscreen'
+
+try:
+    jobid = os.environ['PBS_JOBID']
+    client = ipp.Client(profile='mpi'+str(jobid))
+    view = client.load_balanced_view()
+    print('Clients operating : {}'.format(len(client.ids)))
+    n_clients = len(client.ids)
+except OSError:
+    print('Warning: running without ipcluster')
+    n_clients = 0
 
 # Parse Command line
 parser = argparse.ArgumentParser(description='Do hybrid MC with Verlet')
@@ -53,7 +66,7 @@ b = 13.0
 #            cell = [a, a, a],
 #            pbc = True)
 
-h2o = Atoms('64OHH',
+h2o_mbpol = Atoms('64OHH',
             positions = read('64.xyz').get_positions(),
             cell = [b, b, b],
             pbc = True)
@@ -61,7 +74,6 @@ h2o_siesta = Atoms('64OHH',
             positions = read('64.xyz').get_positions(),
             cell = [b, b, b],
             pbc = True)
-
 
 try:
     os.chdir('./siesta/')
@@ -74,77 +86,89 @@ try:
 except FileExistsError:
     pass
 
+mbp.reconnect_monomers(h2o_mbpol)
+mbp.reconnect_monomers(h2o_mbpol)
 
-mbp.reconnect_monomers(h2o)
-
-h2o.calc = mbp.MbpolCalculator(h2o)
+h2o_mbpol.calc = mbp.MbpolCalculator(h2o_mbpol)
 h2o_siesta.calc = SiestaH2O(basis = args.basis, xc = args.xc)
 
-def shuffle_momenta(h2o):
-    MaxwellBoltzmannDistribution(h2o, args.T * ase_units.kB)
-    h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
-
-
-shuffle_momenta(h2o)
-
-dyn = VelocityVerlet(h2o, args.dt * ase_units.fs)
-
-
-positions = []
-
-dyn.run(args.Nt * 5) 
-h2o_siesta.set_positions(h2o.get_positions())
-
-E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
-pos0 = h2o.get_positions()
-E0pot = h2o_siesta.get_potential_energy()
+E0, h2o_siesta, h2o_mbpol = prop_and_eval(0, h2o_siesta, args, True)
 
 rands = np.random.rand(args.Nmax)
 temperature = args.T * ase_units.kB
 
 trajectory = Trajectory(args.dir + 'verlet' + file_extension + '_keepv_dc.traj', 'a')
-my_log = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.log')
-mbpol_log = logger.MDLogger(dyn, h2o, args.dir + 'verlet' + file_extension + '_keepv_dc.mbpol.log')
-my_log_all = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.all.log')
+log = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.log')
+log_mbpol = logger.MDLogger(dyn, h2o_mbpol, args.dir + 'verlet' + file_extension + '_keepv_dc.mbpol.log')
+log_all = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.all.log')
 
-trajectory.write(h2o)
-
-my_log()
-my_log_all()
-mbpol_log()
+trajectory.write(h2o_siesta)
+log()
+shuffle_momenta = False
 for i in range(args.Nmax):
-    print('Propagating...')
-    dyn.run(args.Nt)
-    print('Propagating done. Calculating new energies...')
-    h2o_siesta.set_positions(h2o.get_positions())
-    E1 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
-    my_log_all()
-    mbpol_log()
-    de = E1 - E0
-    print('Energy difference: {} eV'.format(de))
-
-    if de <= 0:
-        pos1 = h2o.get_positions()
-        positions.append(pos1)
-        pos0 = np.array(pos1)
-        trajectory.write(h2o)
-        my_log()
-#        shuffle_momenta(h2o)
-        E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
-        E0pot = h2o_siesta.get_potential_energy()
+    id_list = list(range(n_clients))
+    h2o_list = [Atoms(h2o_siesta) for i in id_list]
+    args_list = [args] * n_clients
+    shuffle_momenta_list = [shuffle_momenta] * n_clients
+    if n_clients > 1:
+        E1, h2o_siesta_new, h2o_mbpol_new = \
+            view.map_sync(prop_and_eval(id_list, h2o_list, args_list,
+                shuffle_momenta_list))
     else:
-        if rands[i] < np.exp(-de/temperature):
-            pos1 = h2o.get_positions()
-            positions.append(pos1)
-            pos0 = np.array(pos1)
-            trajectory.write(h2o)
-            my_log()
-#            shuffle_momenta(h2o)
-            E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()
-            E0pot = h2o_siesta.get_potential_energy()
-        else:
-            h2o.set_positions(pos0)
-            h2o_siesta.set_positions(pos0)
-            shuffle_momenta(h2o)
-            E0 = h2o.get_kinetic_energy() + E0pot
-            continue
+        E1, h2o_siesta_new, h2o_mbpol_new = \
+            list(map(prop_and_eval(id_list, h2o_list, args_list,
+                shuffle_momenta_list)))
+
+    de = np.array(E1) - E0
+    where_accepted = np.where(de <= 0)[0]
+    if len(where_accepted) > 0:
+        which = where_accepted[0]
+    else:
+        which = np.argmin(de)
+
+    h2o_siesta_new = h2o_siesta_new[which]
+    h2o_mbpol_new = h2o_mbpol_new[which]
+    de = de[which]
+    print('Energy difference: {} eV'.format(de))
+    if de <= 0 or rands[i] < np.exp(-de/temperature):
+        h2o_siesta = h2o_siesta_new
+        h2o_mbpol = h2o_mbpol_new
+        trajectory.write(h2o_siesta)
+        log()
+#        shuffle_momenta(h2o)
+        E0  = h2o_siesta.get_total_energy()
+        shuffle_momenta = False
+    else:
+        shuffle_momenta = True
+        continue
+
+
+def prop_and_eval(engine_id, h2o_siesta, args, shuffle_momenta = False):
+    import numpy as np
+    import mbpol_calculator as mbp
+    from ase import Atoms
+    from ase.md import VelocityVerlet
+    from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+    from ase import units as ase_units
+    import shutil
+    import os
+    os.environ['QT_QPA_PLATFORM']='offscreen'
+
+    try:
+        os.chdir('./{}/'.format(engine_id))
+    except FileNotFoundError:
+        os.mkdir('./{}/'.format(engine_id))
+        os.chdir('./{}/'.format(engine_id))
+
+    if shuffle_momenta:
+        MaxwellBoltzmannDistribution(h2o_siesta, args.T * ase_units.kB)
+        h2o_siesta.set_momenta(h2o_siesta.get_momenta() - \
+         np.mean(h2o_siesta.get_momenta(),axis =0))
+
+    h2o_mbpol = Atoms(h2o_siesta)
+    h2o_mbpol.calc = mbp.MbpolCalculator(h2o_mbpol)
+    dyn = VelocityVerlet(h2o_mbpol, args.dt * ase_units.fs)
+    dyn.run(args.Nt)
+    h2o_siesta.set_positions(h2o_mbpol.get_positions())
+    E1 = h2o_siesta.get_total_energy()
+    return E1, h2o_siesta, h2o_mbpol
