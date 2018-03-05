@@ -92,7 +92,7 @@ dyn = VelocityVerlet(h2o, args.dt * ase_units.fs)
 
 positions = []
 
-#dyn.run(args.Nt * 5) 
+dyn.run(args.Nt * 5) 
 h2o_siesta.set_positions(h2o.get_positions())
 
 E0 = h2o.get_kinetic_energy() + h2o_siesta.get_potential_energy()

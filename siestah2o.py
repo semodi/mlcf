@@ -69,7 +69,7 @@ class SiestaH2O(Siesta):
                fdf_arguments={'DM.MixingWeight': 0.3,
                               'MaxSCFIterations': 50,
                               'DM.NumberPulay': 3,
-                              'DM.Tolerance': 1e-1,
+                              'DM.Tolerance': 5e-4,
                               'ElectronicTemperature': 5e-3,
                               'WriteMullikenPop': 1,
                               'DM.FormattedFiles': 'True'})
@@ -80,7 +80,7 @@ class SiestaH2O(Siesta):
         n_mol = int(len(atoms)/3)
         pot_energy = super().get_potential_energy(atoms)
         D = import_matrix('H2O.DMF')
-        S = import_matrix('H2O.S_custom')
+        S = import_matrix('H2O.S')
         DMS = D.dot(S.T)
         basis = find_basis("H2O.out")
         with open('ML_TIMES','a') as time_log:
