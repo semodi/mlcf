@@ -13,7 +13,7 @@ from siesta_utils.mat import import_matrix
 import time 
 import numpy as np 
 
-os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 -f machinefile siesta < ./%s > ./%s'
+#os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 -f machinefile siesta < ./%s > ./%s'
 #os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
 os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
 os.environ['QT_QPA_PLATFORM']='offscreen'

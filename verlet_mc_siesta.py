@@ -16,7 +16,6 @@ import ipyparallel as ipp
 import time
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
-PPN=16
 try:
     jobid = os.environ['PBS_JOBID']
     client = ipp.Client(profile='mpi'+str(jobid))
@@ -62,7 +61,7 @@ def summarize_times(n_engines, step = 1):
         except:
             FileNotFoundError
 
-def prop_and_eval(engine_id, args, shuffle_momenta = False):
+def prop_and_eval(engine_id, args, shuffle_momenta = False, initialize = False):
     import numpy as np
     import sys
     sys.path.append('/gpfs/home/smdick/md_routines')
@@ -76,14 +75,20 @@ def prop_and_eval(engine_id, args, shuffle_momenta = False):
     import os
     from ase.io import Trajectory
     os.environ['QT_QPA_PLATFORM']='offscreen'
-    os.chdir('/gpfs/home/smdick/md_routines/siesta/{}/'.format(engine_id))
-   
+    os.chdir('/gpfs/home/smdick/md_routines/{}/{}/'.format(args.dir, engine_id))
+    os.environ['SIESTA_COMMAND'] = \
+     'mpirun -n {} -f machinefile siesta < ./%s > ./%s'.format(args.npe*args.ppn)
+ 
     h2o_siesta = read_atoms('tmp.traj', args.basis, args.xc)
 
     if shuffle_momenta:
         MaxwellBoltzmannDistribution(h2o_siesta, args.T * ase_units.kB)
         h2o_siesta.set_momenta(h2o_siesta.get_momenta() - \
          np.mean(h2o_siesta.get_momenta(),axis =0))
+    if initialize:
+        E0 = 0
+    else:
+        E0 = h2o_siesta.get_total_energy()
 
     h2o_mbpol = Atoms(h2o_siesta)
     h2o_mbpol.calc = mbp.MbpolCalculator(h2o_mbpol)
@@ -92,8 +97,8 @@ def prop_and_eval(engine_id, args, shuffle_momenta = False):
     dyn = VelocityVerlet(h2o_mbpol, args.dt * ase_units.fs)
     time_mbpol = Timer('TIME_MBPOL')
     dyn.run(args.Nt)
-    with open('../mbpol.energis','a') as mbpolfile:
-        mbpolfile.write('{}\n'.format(h2o_mbpol.get_potential_energy()))
+    with open('../mbpol.energies','a') as mbpolfile:
+        mbpolfile.write('{}\t{}\n'.format(engine_id, h2o_mbpol.get_potential_energy()))
     time_mbpol.stop()
     h2o_siesta.set_positions(h2o_mbpol.get_positions())
     time_siesta = Timer('TIME_SIESTA_TOT')
@@ -101,7 +106,7 @@ def prop_and_eval(engine_id, args, shuffle_momenta = False):
     time_siesta.stop()
     traj_writer = write_atoms(h2o_siesta, 'tmp.traj')
     os.chdir('../')
-    return E1
+    return E1 - E0
 
 if __name__ == '__main__':
 
@@ -109,7 +114,8 @@ if __name__ == '__main__':
     with open(os.environ['PBS_NODEFILE'],'r') as nodefile:
         hosts = nodefile.read().split()
     print(hosts)
-    nodes = np.unique(hosts)
+    _, idx = np.unique(hosts, return_index=True)
+    nodes = np.array(hosts)[np.sort(idx)]
 
     # Parse Command line
     parser = argparse.ArgumentParser(description='Do hybrid MC with Verlet')
@@ -119,9 +125,10 @@ if __name__ == '__main__':
     parser.add_argument('-Nt', metavar='Nt', type=int, nargs = '?', default=10, help='Number of timesteps between MC')
     parser.add_argument('-Nmax', metavar='Nmax', type=int, nargs = '?', default=1000, help='Max. number of MC steps')
     parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./verlet_mc_results/', help='Save in directory')
-    parser.add_argument('-xc', metavar='xc', type=str, nargs = '?', default='pbe', help='Which XC functional?')
+    parser.add_argument('-xc', metavar='xc', type=str, nargs = '?', default='pbe', help='Which XC functional?') 
     parser.add_argument('-basis', metavar='basis', type=str, nargs= '?', default='dz', help='Basis: qz or dz')
-
+    parser.add_argument('-npe', metavar='npe', type=int, nargs= '?', default=1, help='Nodes per engine')
+    parser.add_argument('-ppn', metavar='ppn', type=int, nargs= '?', default=16, help='Processors per node')
     args = parser.parse_args()
     args.xc = args.xc.upper()
     args.basis = args.basis.lower()
@@ -134,7 +141,12 @@ if __name__ == '__main__':
     print('Save results in ' + args.dir)
     print('Use functional ' + args.xc)
     print('Use basis ' + args.basis)
+    print('Processors per node: {}'.format(args.ppn))
+    print('Nodes per engine: {}'.format(args.npe))
     print('\n===========================================\n')
+
+    if args.npe * n_clients > len(nodes):
+        raise Exception('(Nodes per engine)x(# engines) > (# available nodes)')
 
     file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt),int(args.Nmax))
 
@@ -147,17 +159,13 @@ if __name__ == '__main__':
                 cell = [a, a, a],
                 pbc = True)
 
-#    b = 13.0
-#    h2o_siesta = Atoms('64OHH',
-#                positions = read('64.xyz').get_positions(),
-#                cell = [b, b, b],
-#                pbc = True)
+ #   b = 13.0
+ #   h2o_siesta = Atoms('64OHH',
+ #               positions = read('64.xyz').get_positions(),
+ #               cell = [b, b, b],
+ #               pbc = True)
+ #
 
-    try:
-        os.chdir('./siesta/')
-    except FileNotFoundError:
-        os.mkdir('./siesta/')
-        os.chdir('./siesta/')
     
     time_init = Timer('TIME_STEP')
     try:
@@ -165,21 +173,26 @@ if __name__ == '__main__':
     except FileExistsError:
         pass
 
+    os.chdir(args.dir)
+
     for i in range(n_clients):
         try:
             shutil.os.mkdir('{}'.format(i))
         except FileExistsError:
             pass
         with open('{}/machinefile'.format(i), 'w') as machinefile:
-            for rep in range(PPN):
-                machinefile.write('{}\n'.format(nodes[i]))
-
+            for rep in range(args.npe):
+                for u in range(args.ppn):
+                    machinefile.write('{}\n'.format(nodes[i*args.npe+rep]))
+    
+    os.environ['SIESTA_COMMAND'] = \
+     'mpirun -n {} -f machinefile siesta < ./%s > ./%s'.format(args.npe*args.ppn)
 
 
     h2o_siesta.calc = SiestaH2O(basis = args.basis, xc = args.xc)
 
     write_atoms(h2o_siesta, './0/tmp.traj', False) 
-    E0 = prop_and_eval(0, args, True)
+    prop_and_eval(0, args, True, initialize = True)
     h2o_siesta = read_atoms('./0/tmp.traj', args.basis, args.xc)
 
     rands = np.random.rand(args.Nmax)
@@ -187,10 +200,12 @@ if __name__ == '__main__':
 
     dyn = VelocityVerlet(h2o_siesta, args.dt * ase_units.fs)
     
+
+
     h2o_tracker = Atoms(h2o_siesta) 
-    trajectory = Trajectory(args.dir + 'verlet' + file_extension + '_keepv_dc.traj', 'a')
-    log = logger.MDLogger(dyn, h2o_tracker, args.dir + 'verlet' + file_extension + '_keepv_dc.log')
-    log_all = logger.MDLogger(dyn, h2o_siesta, args.dir + 'verlet' + file_extension + '_keepv_dc.all.log')
+    trajectory = Trajectory('verlet' + file_extension + '_keepv_dc.traj', 'a')
+    log = logger.MDLogger(dyn, h2o_tracker,'verlet' + file_extension + '_keepv_dc.log')
+#    log_all = logger.MDLogger(dyn, h2o_siesta,'verlet' + file_extension + '_keepv_dc.all.log')
 
     trajectory.write(h2o_tracker)
     log()
@@ -214,17 +229,17 @@ if __name__ == '__main__':
             shuffle_momenta_list = [False] + [True] * (n_clients-1)
 
         if n_clients > 1:
-            E1 = \
+            de = \
                 view.map_sync(prop_and_eval,id_list, args_list,
                     shuffle_momenta_list)
         else:
-            E1 = \
+            de = \
                list(map(prop_and_eval, id_list, args_list,
                     shuffle_momenta_list))
         time_step_main.stop()
         time_step_sub = Timer("TIME_STEP_SUB")
-        de = np.array(E1) - E0
-        where_accepted = np.where(de <= 0)[0]
+        de = np.array(de)
+        where_accepted = np.where(rands[i] <= np.exp(-de/temperature))[0]
         if len(where_accepted) > 0:
             which = where_accepted[0]
         else:
@@ -235,16 +250,18 @@ if __name__ == '__main__':
 
         print('Energy difference: {} eV'.format(de))
         if de <= 0 or rands[i] < np.exp(-de/temperature):
+            with open('accepted_ids','a') as idfile:
+                idfile.write('{}\n'.format(which))
             h2o_siesta = h2o_siesta_new
             trajectory.write(h2o_siesta)
             h2o_tracker.set_positions(h2o_siesta.get_positions())
             h2o_tracker.set_momenta(h2o_siesta.get_momenta())
             h2o_tracker.set_calculator(h2o_siesta.get_calculator())
             log()
-    #        shuffle_momenta(h2o)
-            E0  = h2o_siesta.get_total_energy()
             shuffle_momenta = False
         else:
+            with open('accepted_ids','a') as idfile:
+                idfile.write('{}\n'.format(-1))
             shuffle_momenta = True
 
         time_step_sub.stop()
