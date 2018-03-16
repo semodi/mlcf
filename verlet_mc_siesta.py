@@ -96,13 +96,23 @@ def prop_and_eval(engine_id, args, shuffle_momenta = False, initialize = False):
     mbp.reconnect_monomers(h2o_mbpol)
     dyn = VelocityVerlet(h2o_mbpol, args.dt * ase_units.fs)
     time_mbpol = Timer('TIME_MBPOL')
+    with open('./energies.dat', 'a') as energyfile:
+        energyfile.write('Before: {}\t{}\t{}\t||'.format(h2o_mbpol.get_potential_energy(),
+                                               h2o_siesta.get_potential_energy(),
+                                               h2o_siesta.get_kinetic_energy()))
     dyn.run(args.Nt)
-    with open('../mbpol.energies','a') as mbpolfile:
-        mbpolfile.write('{}\t{}\n'.format(engine_id, h2o_mbpol.get_potential_energy()))
     time_mbpol.stop()
     h2o_siesta.set_positions(h2o_mbpol.get_positions())
+    h2o_siesta.set_momenta(h2o_mbpol.get_momenta())
     time_siesta = Timer('TIME_SIESTA_TOT')
     E1 = h2o_siesta.get_total_energy()
+    with open('./energies.dat', 'a') as energyfile:
+        energyfile.write('\t After: {}\t{}\t{}\t\t de = {}\n'.format(h2o_mbpol.get_potential_energy(),
+                                               h2o_siesta.get_potential_energy(),
+                                               h2o_mbpol.get_kinetic_energy(),
+                                               E1 - E0))
+
+
     time_siesta.stop()
     traj_writer = write_atoms(h2o_siesta, 'tmp.traj')
     os.chdir('../')
@@ -116,6 +126,12 @@ if __name__ == '__main__':
     print(hosts)
     _, idx = np.unique(hosts, return_index=True)
     nodes = np.array(hosts)[np.sort(idx)]
+    node_list = []
+
+    for n in nodes:
+        if n != 'hn031':
+            node_list.append(n)
+    nodes = np.array(node_list)
 
     # Parse Command line
     parser = argparse.ArgumentParser(description='Do hybrid MC with Verlet')
@@ -155,7 +171,7 @@ if __name__ == '__main__':
     a = 15.646
 
     h2o_siesta = Atoms('128OHH',
-                positions = read('128.xyz').get_positions(),
+                positions = read('128_md.traj').get_positions(),
                 cell = [a, a, a],
                 pbc = True)
 
@@ -236,6 +252,14 @@ if __name__ == '__main__':
             de = \
                list(map(prop_and_eval, id_list, args_list,
                     shuffle_momenta_list))
+
+        with open('energies.dat', 'a') as summary:
+            for i in range(n_clients):
+                with open('{}/energies.dat'.format(i), 'r') as energyfile:
+                    summary.write(energyfile.readline())
+                with open('{}/energies.dat'.format(i), 'w'):
+                    pass
+                
         time_step_main.stop()
         time_step_sub = Timer("TIME_STEP_SUB")
         de = np.array(de)

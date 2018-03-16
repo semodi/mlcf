@@ -2,7 +2,7 @@
 
 import os
 import tensorflow as tf
-from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS
+from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
 from xcml import load_network
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 from ase.calculators.siesta.parameters import Species, PAOBasisBlock
@@ -12,12 +12,14 @@ from ase.io import Trajectory
 from siesta_utils.mat import import_matrix
 import time 
 import numpy as np 
-
+import pickle
 #os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 -f machinefile siesta < ./%s > ./%s'
-#os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
-os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
-os.environ['QT_QPA_PLATFORM']='offscreen'
-nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_dz/'
+os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+#os.environ['QT_QPA_PLATFORM']='offscreen'
+
+nn_path = '/home/sebastian/Documents/Code/exchange_ml/models/nn_mulliken_dz/'
+krr_path = '/home/sebastian/Documents/Code/exchange_ml/models/'
 
 offset_nn = (-469.766523)
 
@@ -56,7 +58,7 @@ n=2   1   1   E    24.56504     2.20231
 
 class SiestaH2O(Siesta):
 
-    def __init__(self, basis = 'dz', xc='BH'):
+    def __init__(self, basis = 'qz', xc='BH'):
 
         species_o = Species(symbol= 'O',
          basis_set= PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -77,9 +79,17 @@ class SiestaH2O(Siesta):
                               'DM.FormattedFiles': 'True',
                               'DM.UseSaveDM': 'True'})
         self.nn_model = load_network(nn_path)
+
+        with open(krr_path +'krr_Oxygen', 'rb') as krrfile:
+            self.krr_o = pickle.load(krrfile)
+
+        with open(krr_path +'krr_Hydrogen', 'rb') as krrfile:
+            self.krr_h = pickle.load(krrfile)
+
         self.last_positions = None
         self.Epot = 0
-        
+        self.forces = 0 
+
     def calculation_required(self, atoms, quantities = None):
         if isinstance(self.last_positions,np.ndarray):
             return not np.allclose(atoms.get_positions(), self.last_positions)
@@ -95,33 +105,26 @@ class SiestaH2O(Siesta):
             print(n_mol)
             time_siesta = Timer("TIME_SIESTA_BARE")
             pot_energy = super().get_potential_energy(atoms)
+            forces = super().get_forces(atoms)
             time_siesta.stop()
-
-            # ========== Use if mulliken population oriented =========
-
-#            time_matrix_io = Timer("TIME_MATRIX_IO")
-#            D = import_matrix('H2O.DMF')
-#            S = import_matrix('H2O.S')
-#            time_matrix_io.stop()
-#            time_getM = Timer('TIME_GETM')
-#            DMS = D.dot(S.T)
-#            basis = find_basis("H2O.out")
-#            M = getM_from_DMS(DMS, atoms.get_positions(),
-#                     n_mol, basis)
-#            time_getM.stop()
-            
-            # ========== Use if mulliken population non-oriented ======
-
-            time_ML = Timer("TIME_ML")
-            M = find_mulliken('H2O.out', n_mol, n_o_orb= 13, n_h_orb = 5)
+            M = find_mulliken('H2O.out',n_mol, 13, 5)
             correction = use_model(M.reshape(1,-1), n_mol,
                  nn=self.nn_model, n_o_orb=13, n_h_orb=5)[0]
-            time_ML.stop()
+            correction_force = use_force_model(M.reshape(-1,23),self.krr_o, 
+                self.krr_h,n_o_orb=13, n_h_orb=5, glob_cs= True, 
+                coords = atoms.get_positions())
             self.last_positions = atoms.get_positions() 
             self.Epot = pot_energy - correction - n_mol * offset_nn
+            self.forces = forces - correction_force.reshape(-1,3)
             print('Corrected Epot = {}'.format(self.Epot))
 
         return self.Epot 
+
+    def get_forces(self, atoms):
+        print('get_forces called')
+        self.get_potential_energy(atoms)
+        return self.forces
+        
 
 class Timer:
 
