@@ -56,7 +56,7 @@ n=2   1   1   E    24.56504     2.20231
 
 class SiestaH2O(Siesta):
 
-    def __init__(self, basis = 'qz', xc='BH'):
+    def __init__(self, basis = 'dz', xc='BH'):
 
         species_o = Species(symbol= 'O',
          basis_set= PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -96,17 +96,24 @@ class SiestaH2O(Siesta):
             time_siesta = Timer("TIME_SIESTA_BARE")
             pot_energy = super().get_potential_energy(atoms)
             time_siesta.stop()
-            time_matrix_io = Timer("TIME_MATRIX_IO")
-            D = import_matrix('H2O.DMF')
-            S = import_matrix('H2O.S')
-            time_matrix_io.stop()
-            time_getM = Timer('TIME_GETM')
-            DMS = D.dot(S.T)
-            basis = find_basis("H2O.out")
-            M = getM_from_DMS(DMS, atoms.get_positions(),
-                     n_mol, basis)
-            time_getM.stop()
+
+            # ========== Use if mulliken population oriented =========
+
+#            time_matrix_io = Timer("TIME_MATRIX_IO")
+#            D = import_matrix('H2O.DMF')
+#            S = import_matrix('H2O.S')
+#            time_matrix_io.stop()
+#            time_getM = Timer('TIME_GETM')
+#            DMS = D.dot(S.T)
+#            basis = find_basis("H2O.out")
+#            M = getM_from_DMS(DMS, atoms.get_positions(),
+#                     n_mol, basis)
+#            time_getM.stop()
+            
+            # ========== Use if mulliken population non-oriented ======
+
             time_ML = Timer("TIME_ML")
+            M = find_mulliken('H2O.out', n_mol, n_o_orb= 13, n_h_orb = 5)
             correction = use_model(M.reshape(1,-1), n_mol,
                  nn=self.nn_model, n_o_orb=13, n_h_orb=5)[0]
             time_ML.stop()
