@@ -6,6 +6,7 @@ from ase.md.npt import NPT
 from ase.md import VelocityVerlet
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.io import read,write, Trajectory
+from ase import io
 from ase import units as ase_units
 from ase.md import logger
 import argparse
@@ -16,17 +17,18 @@ import ipyparallel as ipp
 import time
 #TODO: Get rid of absolute paths
 #os.environ['QT_QPA_PLATFORM']='offscreen'
-#try:
+try:
 #    jobid = os.environ['PBS_JOBID']
 #    client = ipp.Client(profile='mpi'+str(jobid))
-#    view = client.load_balanced_view()
-#    print('Clients operating : {}'.format(len(client.ids)))
-#    n_clients = len(client.ids)
-#except OSError:
-#    print('Warning: running without ipcluster')
-#    n_clients = 0
-#if n_clients == 0:
-#    n_clients = 1
+    client = ipp.Client()
+    view = client.load_balanced_view()
+    print('Clients operating : {}'.format(len(client.ids)))
+    n_clients = len(client.ids)
+except OSError:
+    print('Warning: running without ipcluster')
+    n_clients = 0
+if n_clients == 0:
+    n_clients = 1
 
 if __name__ == '__main__':
 
@@ -36,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('-T', metavar='T', type=float, nargs = '?', default=300.0, help ='Temperature in Kelvin')
     parser.add_argument('-dt', metavar='dt', type=float, nargs = '?', default=1.0, help='Timestep in fs')
     parser.add_argument('-Nt', metavar='Nt', type=int, nargs = '?', default=10, help='Number of timesteps')
-    parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./verlet_mc_results/', help='Save in directory')
+    parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./md_siesta_results/', help='Save in directory')
     parser.add_argument('-xc', metavar='xc', type=str, nargs = '?', default='pbe', help='Which XC functional?') 
     parser.add_argument('-basis', metavar='basis', type=str, nargs= '?', default='dz', help='Basis: qz or dz')
     parser.add_argument('-npe', metavar='npe', type=int, nargs= '?', default=1, help='Nodes per engine')
@@ -46,7 +48,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.xc = args.xc.upper()
     args.basis = args.basis.lower()
-
+    ttime = args.ttime
     print('\n============ Starting calculation ========== \n \n')
     print('Temperature = {} K'.format(args.T))
     print('Timesteps = {} fs'.format(args.dt))
@@ -58,7 +60,6 @@ if __name__ == '__main__':
     print('Nodes per engine: {}'.format(args.npe))
     print('\n===========================================\n')
 
-    file_extension = '{}_{}_{}_{}'.format(int(args.T),int(args.dt*1000),int(args.Nt),int(args.Nmax))
 
     # Load initial configuration
     
@@ -74,7 +75,13 @@ if __name__ == '__main__':
                 positions = read('64.xyz').get_positions(),
                 cell = [b, b, b],
                 pbc = True)
- 
+#    c = 20.0
+#    h2o = Atoms('OHH',
+#                positions = read('64.xyz').get_positions()[:3],
+#                cell = [c, c, c],
+#                pbc = True)
+# 
+
 
     try:
         shutil.os.mkdir(args.dir)
@@ -83,7 +90,17 @@ if __name__ == '__main__':
 
     os.chdir(args.dir)
 
+    try:
+        shutil.os.mkdir('siesta/')
+    except FileExistsError:
+        pass
+
+    os.chdir('siesta/')
+
+
     h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc)
+    if n_clients > 1:
+        h2o.calc.set_client(client)
 
     temperature = args.T * ase_units.kB
 
@@ -92,13 +109,13 @@ if __name__ == '__main__':
     print('ttime= {} fs :: temperature = {}'.format(ttime,h2o.get_temperature()))
 
     h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
-    traj = io.Trajectory('md_siesta_{}.traj'.format(int(ttime)),
+    traj = io.Trajectory('../md_siesta_{}.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
 
     dyn = NPT(h2o, timestep = args.dt * ase_units.fs,
               temperature =  temperature, externalstress = 0,
               ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
-                         logfile='./md_siesta.log'.format(int(ttime)))
+                         logfile='../md_siesta.log'.format(int(ttime)))
 
     dyn.run(args.Nt)

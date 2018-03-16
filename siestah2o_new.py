@@ -56,6 +56,19 @@ n=2   1   1   E    24.56504     2.20231
      3.5281
      1.00000"""}
 
+def get_M_parallel(cwd, positions, n_mol, which):
+    from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
+    from siesta_utils.mat import import_matrix
+    import numpy as np
+
+    D = import_matrix(cwd + '/H2O.DMF')
+    S = import_matrix(cwd + '/H2O.S')
+    DMS = D.dot(S.T)
+    basis = find_basis(cwd + "/H2O.out")
+    mol_list = list(range(n_mol))
+    M = getM_from_DMS(DMS, positions,
+                n_mol, basis, mol_list)
+
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH'):
@@ -89,6 +102,16 @@ class SiestaH2O(Siesta):
         self.last_positions = None
         self.Epot = 0
         self.forces = 0 
+        self.client = None
+        self.view = None
+        self.n_clients = 1
+
+    def set_client(self, client):
+        self.client = client
+        self.view = self.client.load_balanced_view()
+        self.n_clients = len(client.ids)
+        if self.n_clients == 0:
+            self.n_clients = 1
 
     def calculation_required(self, atoms, quantities = None):
         if isinstance(self.last_positions,np.ndarray):
@@ -98,30 +121,48 @@ class SiestaH2O(Siesta):
 
     def get_potential_energy(self, atoms, force_consistent = False):
         #TODO: Fix all magic numbers !!!
-        print('get_potential_energy called')
         if self.calculation_required(atoms):
-            print('Calculating energies with Siesta')
             n_mol = int(len(atoms)/3)
             print(n_mol)
             time_siesta = Timer("TIME_SIESTA_BARE")
             pot_energy = super().get_potential_energy(atoms)
             forces = super().get_forces(atoms)
             time_siesta.stop()
-            M = find_mulliken('H2O.out',n_mol, 13, 5)
+
+            
+            mol_list = list(range(n_mol))
+            if self.n_clients > 1:
+                time_getM = Timer('TIME_GETM')
+                M = self.view.map_sync(get_M_parallel,[os.getcwd()]*n_mol, [atoms.get_positions()]*n_mol,
+                        [n_mol]*n_mol, mol_list)
+                M = np.concatenate(M)
+                time_getM.stop()
+            else:
+                time_getM = Timer('TIME_GETM')
+                time_matrix_io = Timer("TIME_MATRIX_IO")
+                D = import_matrix('H2O.DMF')
+                S = import_matrix('H2O.S')
+                time_matrix_io.stop()
+                DMS = D.dot(S.T)
+                basis = find_basis("H2O.out")
+                M = getM_from_DMS(DMS, atoms.get_positions(),
+                         n_mol, basis)
+                time_getM.stop()
+
+            time_ML = Timer("TIME_ML")
             correction = use_model(M.reshape(1,-1), n_mol,
                  nn=self.nn_model, n_o_orb=13, n_h_orb=5)[0]
             correction_force = use_force_model(M.reshape(-1,23),self.krr_o, 
                 self.krr_h,n_o_orb=13, n_h_orb=5, glob_cs= True, 
                 coords = atoms.get_positions())
+            time_ML.stop()
             self.last_positions = atoms.get_positions() 
             self.Epot = pot_energy - correction - n_mol * offset_nn
             self.forces = forces - correction_force.reshape(-1,3)
-            print('Corrected Epot = {}'.format(self.Epot))
 
         return self.Epot 
 
     def get_forces(self, atoms):
-        print('get_forces called')
         self.get_potential_energy(atoms)
         return self.forces
         
