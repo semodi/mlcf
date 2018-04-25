@@ -10,8 +10,8 @@ from ase import Atoms
 from ase.units import Ry
 from ase.io import Trajectory
 from siesta_utils.mat import import_matrix
-import time 
-import numpy as np 
+import time
+import numpy as np
 import pickle
 #os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 -f machinefile siesta < ./%s > ./%s'
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
@@ -57,17 +57,6 @@ n=2   1   1   E    24.56504     2.20231
      1.00000"""}
 
 def get_M_parallel(cwd, positions, n_mol, which):
-    from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
-    from siesta_utils.mat import import_matrix
-    import numpy as np
-
-    D = import_matrix(cwd + '/H2O.DMF')
-    S = import_matrix(cwd + '/H2O.S')
-    DMS = D.dot(S.T)
-    basis = find_basis(cwd + "/H2O.out")
-    mol_list = list(range(n_mol))
-    M = getM_from_DMS(DMS, positions,
-                n_mol, basis, mol_list)
 
 class SiestaH2O(Siesta):
 
@@ -101,17 +90,11 @@ class SiestaH2O(Siesta):
 
         self.last_positions = None
         self.Epot = 0
-        self.forces = 0 
-        self.client = None
-        self.view = None
-        self.n_clients = 1
+        self.forces = 0
+        self.feature_getter = None
 
-    def set_client(self, client):
-        self.client = client
-        self.view = self.client.load_balanced_view()
-        self.n_clients = len(client.ids)
-        if self.n_clients == 0:
-            self.n_clients = 1
+    def set_feature_getter(feature_getter):
+        self.feature_getter = feature_getter
 
     def calculation_required(self, atoms, quantities = None):
         if isinstance(self.last_positions,np.ndarray):
@@ -123,49 +106,89 @@ class SiestaH2O(Siesta):
         #TODO: Fix all magic numbers !!!
         if self.calculation_required(atoms):
             n_mol = int(len(atoms)/3)
-            print(n_mol)
             time_siesta = Timer("TIME_SIESTA_BARE")
             pot_energy = super().get_potential_energy(atoms)
             forces = super().get_forces(atoms)
             time_siesta.stop()
-
-            
-            mol_list = list(range(n_mol))
-            if self.n_clients > 1:
-                time_getM = Timer('TIME_GETM')
-                M = self.view.map_sync(get_M_parallel,[os.getcwd()]*n_mol, [atoms.get_positions()]*n_mol,
-                        [n_mol]*n_mol, mol_list)
-                M = np.concatenate(M)
-                time_getM.stop()
-            else:
-                time_getM = Timer('TIME_GETM')
-                time_matrix_io = Timer("TIME_MATRIX_IO")
-                D = import_matrix('H2O.DMF')
-                S = import_matrix('H2O.S')
-                time_matrix_io.stop()
-                DMS = D.dot(S.T)
-                basis = find_basis("H2O.out")
-                M = getM_from_DMS(DMS, atoms.get_positions(),
-                         n_mol, basis)
-                time_getM.stop()
-
+            features, n_o_orb, n_h_orb = self.feature_getter.get_features('./')
+            n_orb = n_o_orb + 2*n_h_orb
             time_ML = Timer("TIME_ML")
-            correction = use_model(M.reshape(1,-1), n_mol,
-                 nn=self.nn_model, n_o_orb=13, n_h_orb=5)[0]
-            correction_force = use_force_model(M.reshape(-1,23),self.krr_o, 
-                self.krr_h,n_o_orb=13, n_h_orb=5, glob_cs= True, 
+            correction = use_model(features.reshape(1,-1), n_mol,
+                 nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
+            correction_force = use_force_model(M.reshape(-1,n_orb),self.krr_o,
+                self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
                 coords = atoms.get_positions())
             time_ML.stop()
-            self.last_positions = atoms.get_positions() 
+            self.last_positions = atoms.get_positions()
             self.Epot = pot_energy - correction - n_mol * offset_nn
             self.forces = forces - correction_force.reshape(-1,3)
-
-        return self.Epot 
+        return self.Epot
 
     def get_forces(self, atoms):
         self.get_potential_energy(atoms)
         return self.forces
-        
+
+
+class FeatureGetter():
+
+    class DummyView():
+
+        def __init__(self):
+            pass
+
+        def map_sync(self, *args):
+            return list(map(*args))
+
+    def __init__(self, n_mol, n_o_orb = 13, n_h_orb = 5, client = None):
+        self.n_o_orb = n_o_orb
+        self.n_h_orb = n_h_orb
+        self.n_mol = n_mol
+        if not client == None:
+            try:
+                self.view = client.load_balanced_view()
+                print('Clients operating : {}'.format(len(client.ids)))
+                self. n_clients = len(client.ids)
+            except OSError:
+                print('Warning: running without ipcluster')
+                self.n_clients = 0
+            if n_clients == 0:
+                self.n_clients = 1
+        else:
+            self.view = DummyView()
+            self.n_clients = 1
+
+    def get_features(self, directory):
+
+        # ========== Use if mulliken population oriented =========
+
+        time_getM = Timer('TIME_GETM')
+        time_matrix_io = Timer("TIME_MATRIX_IO")
+        D = import_matrix('H2O.DMF')
+        S = import_matrix('H2O.S')
+        time_matrix_io.stop()
+        DMS = D.dot(S.T)
+        basis = find_basis("H2O.out")
+
+        M = self.view.map_sync(__single_thread, [DMS]*n_mol, [n_mol]*n_mol,
+            list(range(n_mol)),[os.getcwd()]*n_mol)
+        M = np.concatenate(M, axis = 1)
+        time_getM.stop()
+
+        # ========== Use if mulliken population non-oriented ======
+
+        # time_ML = Timer("TIME_ML")
+        # M = find_mulliken('H2O.out', n_mol, n_o_orb= self.n_o_orb,
+        #   n_h_orb = self.n_h_orb)
+        # time_ML.stop()
+        #
+        return M, self.n_o_orb, self.n_h_orb
+
+    def __single_thread(self, DMS, n_mol, which_mol, cwd):
+        from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
+        basis = find_basis(cwd + "/H2O.out")
+        M = getM_from_DMS(DMS, positions,
+                    n_mol, basis, which_mol)
+        return M
 
 class Timer:
 
@@ -179,14 +202,14 @@ class Timer:
     def start(self):
         self.start = time.time()
         self.running = True
-    
+
     def pause(self):
         if self.running:
             self.accum = time.time() - self.start
             self.running = False
         else:
             raise Exception('Timer not running')
-        
+
     def stop(self):
         if self.running:
             with open(self.name, self.mode) as timefile:
@@ -196,7 +219,7 @@ class Timer:
             self.accum = 0
         else:
             raise Exception('Timer not running')
-     
+
 
 def write_atoms(atoms, path, save_energy = True):
     traj = Trajectory(path,'w')
@@ -218,5 +241,3 @@ def read_atoms(path, basis, xc):
 
     h2o.set_calculator(siesta_calc)
     return h2o
-    
- 
