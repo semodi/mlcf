@@ -3,13 +3,13 @@ import sys
 import os
 import tensorflow as tf
 from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
-from xcml import load_network
+from xcml import load_network, box_fast
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 try:
     from ase.calculators.siesta.parameters import Species
 except ImportError:
     from ase.calculators.siesta.parameters import Specie as Species
-    
+
 from ase.calculators.siesta.parameters import PAOBasisBlock
 from ase import Atoms
 from ase.units import Ry
@@ -200,13 +200,19 @@ class FeatureGetter():
                     n_mol, basis, which_mol)
         return M
 
-def single_thread_descriptors(coords, rho, grid, uc, basis):
+def single_thread_descriptors(coords, rho_list, grid, uc, basis):
     import xcml
     import siesta_utils.grid as siesta
-    siesta.rho = rho
+
     siesta.grid = grid
     siesta.unitcell = uc
-    return xcml.full_decomposition(coords, siesta, basis)
+    all_descr = []
+
+    for c, rho, al in zip(coords,rho_list, ['o','h1','h2']):
+        siesta.rho = rho
+        all_descr.append(xcml.atom_decomposition(coords, siesta, basis, al))
+
+    return np.concatenate(all_descr)
 
 class DescriptorGetter(FeatureGetter):
 
@@ -224,7 +230,16 @@ class DescriptorGetter(FeatureGetter):
         time_getfeat = Timer('TIME_GETFEAT')
         siesta.get_data('./h2o.RHOXC')
         coords = coords.reshape(-1,3,3)
-        descr = self.view.map_sync(self.single_thread, coords, [siesta.rho]*len(coords),
+
+        rho_snippets = []
+        for c in coords:
+            snippet = []
+            for a, l in zip(c,['o', 'h', 'h']):
+                snippet.append(siesta.rho[box_fast(a,
+                 self.basis['r_c_' + l], siesta)])
+            rho_snippets.append(snippet)
+
+        descr = self.view.map_sync(self.single_thread, coords, rho_snippets,
             [siesta.grid]*len(coords),[siesta.unitcell]*len(coords),
             [self.basis]*len(coords))
 
