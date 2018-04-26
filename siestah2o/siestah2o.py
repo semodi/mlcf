@@ -201,9 +201,11 @@ class FeatureGetter():
         return M
 
 def single_thread_descriptors(coords, rho_list, grid, uc, basis):
+    import os 
+    os.environ['QT_QPA_PLATFORM']='offscreen'
     import xcml
     import siesta_utils.grid as siesta
-
+    
     siesta.grid = grid
     siesta.unitcell = uc
     all_descr = []
