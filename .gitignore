@@ -4,3 +4,4 @@ __pycache__/
 siesta/
 *egg-info/
 .ipynb_checkpoints/
+TIME*

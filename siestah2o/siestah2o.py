@@ -5,7 +5,12 @@ import tensorflow as tf
 from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
 from xcml import load_network
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
-from ase.calculators.siesta.parameters import Species, PAOBasisBlock
+try:
+    from ase.calculators.siesta.parameters import Species
+except ImportError:
+    from ase.calculators.siesta.parameters import Specie as Species
+    
+from ase.calculators.siesta.parameters import PAOBasisBlock
 from ase import Atoms
 from ase.units import Ry
 from ase.io import Trajectory
