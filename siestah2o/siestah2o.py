@@ -228,7 +228,7 @@ class DescriptorGetter(FeatureGetter):
     def get_features(self, coords):
         # ========== Use if mulliken population oriented =========
         time_getfeat = Timer('TIME_GETFEAT')
-        siesta.get_data('./h2o.RHOXC')
+        siesta.get_data_bin('./h2o.RHOXC_bin')
         coords = coords.reshape(-1,3,3)
 
         rho_snippets = []
