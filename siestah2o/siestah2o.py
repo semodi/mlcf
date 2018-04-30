@@ -82,11 +82,11 @@ def log_all(energy_siesta = None, energy_corrected = None,
             file.write('{:.4f}\t{:.4f}\n'.format(energy_siesta,
                  energy_corrected))
         with open('forces_siesta.dat', 'a') as file:
-            numpy.savetxt(file, forces_siesta, fmt = '%.4f')
+            np.savetxt(file, forces_siesta, fmt = '%.4f')
         with open('forces_corrected.dat', 'a') as file:
-            numpy.savetxt(file, forces_corrected, fmt = '%.4f')
+            np.savetxt(file, forces_corrected, fmt = '%.4f')
         with open('features.dat', 'a') as file:
-            numpy.savetxt(file, features, fmt = '%.4f')
+            np.savetxt(file, features, fmt = '%.4f')
 
     
 
