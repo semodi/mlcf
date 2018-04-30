@@ -147,6 +147,7 @@ class SiestaH2O(Siesta):
 
     def get_potential_energy(self, atoms, force_consistent = False):
         if self.calculation_required(atoms):
+            self.nn_model = load_network(nn_path) # TEMP FIX 
             time_step = Timer("TIME_FULL_STEP") 
             n_mol = int(len(atoms)/3)
             time_siesta = Timer("TIME_SIESTA_BARE")
