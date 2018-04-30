@@ -1,6 +1,5 @@
-from siestah2o_new import SiestaH2O, write_atoms, read_atoms, Timer
+from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter
 import numpy as np
-import mbpol_calculator as mbp
 from ase import Atoms
 from ase.md.npt import NPT
 from ase.md import VelocityVerlet
@@ -11,16 +10,14 @@ from ase import units as ase_units
 from ase.md import logger
 import argparse
 import shutil
-import pimd_wrapper as pimd
 import os
 import ipyparallel as ipp
 import time
 #TODO: Get rid of absolute paths
-#os.environ['QT_QPA_PLATFORM']='offscreen'
+os.environ['QT_QPA_PLATFORM']='offscreen'
 try:
-#    jobid = os.environ['PBS_JOBID']
-#    client = ipp.Client(profile='mpi'+str(jobid))
-    client = ipp.Client()
+    jobid = os.environ['PBS_JOBID']
+    client = ipp.Client(profile='mpi'+str(jobid))
     view = client.load_balanced_view()
     print('Clients operating : {}'.format(len(client.ids)))
     n_clients = len(client.ids)
@@ -43,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('-basis', metavar='basis', type=str, nargs= '?', default='dz', help='Basis: qz or dz')
     parser.add_argument('-npe', metavar='npe', type=int, nargs= '?', default=1, help='Nodes per engine')
     parser.add_argument('-ppn', metavar='ppn', type=int, nargs= '?', default=16, help='Processors per node')
-    parser.add_argument('-ttime', metavar='ttime', type=int, nargs= '?', default=0.1, help='ttime for NH thermostat')
+    parser.add_argument('-ttime', metavar='ttime', type=int, nargs= '?', default=10, help='ttime for NH thermostat')
 
     args = parser.parse_args()
     args.xc = args.xc.upper()
@@ -63,18 +60,18 @@ if __name__ == '__main__':
 
     # Load initial configuration
     
-#    a = 15.646
+    a = 15.646
 
-#    h2o = Atoms('128OHH',
-#                positions = read('128.xyz').get_positions(),
-#                cell = [a, a, a],
-#                pbc = True)
-
-    b = 13.0
-    h2o = Atoms('64OHH',
-                positions = read('64.xyz').get_positions(),
-                cell = [b, b, b],
+    h2o = Atoms('128OHH',
+                positions = read('128.xyz').get_positions(),
+                cell = [a, a, a],
                 pbc = True)
+
+#    b = 13.0
+#    h2o = Atoms('64OHH',
+#                positions = read('64.xyz').get_positions(),
+#                cell = [b, b, b],
+#                pbc = True)
 #    c = 20.0
 #    h2o = Atoms('OHH',
 #                positions = read('64.xyz').get_positions()[:3],
@@ -97,11 +94,18 @@ if __name__ == '__main__':
 
     os.chdir('siesta/')
 
+    os.environ['SIESTA_COMMAND'] =\
+         'mpirun -n {} siesta < ./%s > ./%s'.format(os.environ['PBS_NP'])
 
-    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc)
+#    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, corrected = False)
+    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, corrected = True, log_accuracy = True)
+
     if n_clients > 1:
-        h2o.calc.set_client(client)
+        descr_getter = DescriptorGetter(client)
+    else:
+        descr_getter = DescriptorGetter()
 
+    h2o.calc.set_feature_getter(descr_getter)
     temperature = args.T * ase_units.kB
 
     # Setting the initial T 100 K lower leads to faster convergence of initial oscillations
@@ -117,5 +121,4 @@ if __name__ == '__main__':
               ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
-
     dyn.run(args.Nt)
