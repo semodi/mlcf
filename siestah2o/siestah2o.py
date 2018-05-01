@@ -92,12 +92,12 @@ def log_all(energy_siesta = None, energy_corrected = None,
 
 class SiestaH2O(Siesta):
 
-    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, corrected = True, log_accuracy = False):
+    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, corrected = True, log_accuracy = False, use_fd = False):
 
         species_o = Species(symbol= 'O',
-         basis_set= PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
+         basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
         species_h = Species(symbol= 'H',
-         basis_set= PAOBasisBlock(basis_sets['h_basis_{}'.format(basis)]))
+         basis_set = PAOBasisBlock(basis_sets['h_basis_{}'.format(basis)]))
 
         super().__init__(label='H2O',
                xc=xc,
@@ -120,18 +120,19 @@ class SiestaH2O(Siesta):
 
         self.set_fdf_arguments(fdf_arguments)
         self.nn_model = load_network(nn_path)
+        self.use_fd = use_fd
 
-#        with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
-#            self.krr_o = pickle.load(krrfile)
-#
-#        with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
-#            self.krr_h = pickle.load(krrfile)
-
-        with open(krr_path +'krr_dx_O_descriptors', 'rb') as krrfile:
+        with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
             self.krr_o = pickle.load(krrfile)
 
-        with open(krr_path +'krr_dx_H_descriptors', 'rb') as krrfile:
+        with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
             self.krr_h = pickle.load(krrfile)
+
+        with open(krr_path +'krr_dx_O_descriptors', 'rb') as krrfile:
+            self.krr_o_dx = pickle.load(krrfile)
+
+        with open(krr_path +'krr_dx_H_descriptors', 'rb') as krrfile:
+            self.krr_h_dx = pickle.load(krrfile)
         
 
         self.last_positions = None
@@ -172,10 +173,16 @@ class SiestaH2O(Siesta):
                 time_ML = Timer("TIME_ML")
                 correction = use_model_descr(features.reshape(1,-1), n_mol,
                      nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
-                correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o,
-                    self.krr_h,self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                    coords = fold_back_coords(atoms.get_positions(), siesta),
-                    direction_factor = 1e4)
+
+                if self.use_fd:
+                    correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
+                        self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
+                        coords = fold_back_coords(atoms.get_positions(), siesta),
+                        direction_factor = 1e4)
+                else:
+                    correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
+                        self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
+                        coords = fold_back_coords(atoms.get_positions(), siesta))
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
@@ -184,10 +191,8 @@ class SiestaH2O(Siesta):
                     log_all(pot_energy + correction, pot_energy,
                          forces + correction_force.reshape(-1,3), forces,
                          features)
-
             self.Epot = pot_energy
             self.forces = forces 
-
             time_step.stop() 
         return self.Epot
 
