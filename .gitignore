@@ -9,3 +9,5 @@ siesta/
 TIME*
 test_run/
 H2O*
+*.pdf
+*.eps
