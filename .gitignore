@@ -7,3 +7,5 @@ siesta/
 *egg-info/
 .ipynb_checkpoints/
 TIME*
+test_run/
+H2O*
