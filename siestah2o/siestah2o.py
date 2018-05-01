@@ -2,7 +2,7 @@ import sys
 import os
 import tensorflow as tf
 from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
-from xcml.misc import use_model_descr
+from xcml.misc import use_model_descr, use_force_model_fd
 from xcml import load_network, box_fast, fold_back_coords
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 try:
@@ -121,11 +121,18 @@ class SiestaH2O(Siesta):
         self.set_fdf_arguments(fdf_arguments)
         self.nn_model = load_network(nn_path)
 
-        with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
+#        with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
+#            self.krr_o = pickle.load(krrfile)
+#
+#        with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
+#            self.krr_h = pickle.load(krrfile)
+
+        with open(krr_path +'krr_dx_O_descriptors', 'rb') as krrfile:
             self.krr_o = pickle.load(krrfile)
 
-        with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
+        with open(krr_path +'krr_dx_H_descriptors', 'rb') as krrfile:
             self.krr_h = pickle.load(krrfile)
+        
 
         self.last_positions = None
         self.Epot = 0
@@ -165,9 +172,11 @@ class SiestaH2O(Siesta):
                 time_ML = Timer("TIME_ML")
                 correction = use_model_descr(features.reshape(1,-1), n_mol,
                      nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
-                correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
-                    self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                    coords = fold_back_coords(atoms.get_positions(), siesta))
+                correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o,
+                    self.krr_h,self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
+                    coords = fold_back_coords(atoms.get_positions(), siesta),
+                    direction_factor = 1e4)
+
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces = forces - correction_force.reshape(-1,3)
