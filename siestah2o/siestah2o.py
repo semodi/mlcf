@@ -94,17 +94,37 @@ class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, corrected = True, log_accuracy = False, use_fd = False):
 
-        species_o = Species(symbol= 'O',
-         basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
-        species_h = Species(symbol= 'H',
-         basis_set = PAOBasisBlock(basis_sets['h_basis_{}'.format(basis)]))
+        if basis == 'sz':
+            super().__init__(label='H2O',
+               xc=xc,
+               mesh_cutoff=200 * Ry,
+               energy_shift=0.02 * Ry,
+               basis_set = 'SZ')
 
-        super().__init__(label='H2O',
+            with open(krr_path +'krr_Oxygen_sztodz', 'rb') as krrfile:
+                self.krr_o = pickle.load(krrfile)
+
+            with open(krr_path +'krr_Hydrogen_sztodz', 'rb') as krrfile:
+                self.krr_h = pickle.load(krrfile)
+        else: 
+            species_o = Species(symbol= 'O',
+             basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
+            species_h = Species(symbol= 'H',
+             basis_set = PAOBasisBlock(basis_sets['h_basis_{}'.format(basis)]))
+
+            super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-        
+
+            with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
+                self.krr_o = pickle.load(krrfile)
+
+            with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
+                self.krr_h = pickle.load(krrfile)
+
+       
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
         self.allowed_keywords = allowed_keys
@@ -117,16 +137,12 @@ class SiestaH2O(Siesta):
 #                              'DM.FormattedFiles': 'True',
                               'DM.UseSaveDM': 'True',
                               'SaveRhoXC': 'True'}
+        if basis == 'sz':
+            fdf_arguments['SolutionMethod'] = 'OMM'
 
         self.set_fdf_arguments(fdf_arguments)
         self.nn_model = load_network(nn_path)
         self.use_fd = use_fd
-
-        with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
-            self.krr_o = pickle.load(krrfile)
-
-        with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
-            self.krr_h = pickle.load(krrfile)
 
         with open(krr_path +'krr_dx_O_descriptors', 'rb') as krrfile:
             self.krr_o_dx = pickle.load(krrfile)
@@ -144,6 +160,9 @@ class SiestaH2O(Siesta):
         if self.log_accuracy:
             log_all() 
 
+    def read_eigenvalues(self):
+        pass
+
     def set_feature_getter(self,feature_getter):
         self.feature_getter = feature_getter
 
@@ -159,8 +178,12 @@ class SiestaH2O(Siesta):
             time_step = Timer("TIME_FULL_STEP") 
             n_mol = int(len(atoms)/3)
             time_siesta = Timer("TIME_SIESTA_BARE")
+            time_siesta1 = Timer("TIME_SIESTA_1")
             pot_energy = super().get_potential_energy(atoms)
+            time_siesta1.stop()
+            time_siesta2 = Timer("TIME_SIESTA_2")
             forces = super().get_forces(atoms)
+            time_siesta2.stop()
             time_siesta.stop()
             self.last_positions = atoms.get_positions()
 
@@ -315,14 +338,14 @@ class DescriptorGetter(FeatureGetter):
 
 class Timer:
 
-    def __init__(self, name='TIME', mode='w'):
+    def __init__(self, name='TIME', mode='a'):
         self.name = name
         self.start = time.time()
         self.accum = 0
         self.running = True
         self.mode = mode
 
-    def start(self):
+    def start_timer(self):
         self.start = time.time()
         self.running = True
 
