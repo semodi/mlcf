@@ -122,4 +122,9 @@ if __name__ == '__main__':
               ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
-    dyn.run(args.Nt)
+
+    time_step = Timer('Timer') 
+    for i in range(args.Nt):
+        time_step.start_timer()
+        dyn.run(1)
+        time_step.stop() 
