@@ -163,6 +163,13 @@ class SiestaH2O(Siesta):
     def read_eigenvalues(self):
         pass
 
+    def read_results(self):
+        """ Overrides read_results in base class to skip reading
+        the charge density etc. for speed-up"""
+
+        self.read_energy()
+        self.read_forces_stress()
+
     def set_feature_getter(self,feature_getter):
         self.feature_getter = feature_getter
 
