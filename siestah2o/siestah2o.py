@@ -94,12 +94,12 @@ class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, corrected = True, log_accuracy = False, use_fd = False):
 
-        if basis == 'sz':
+        if basis != 'dz' and basis != 'qz':
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
-               basis_set = 'SZ')
+               basis_set = basis)
 
             with open(krr_path +'krr_Oxygen_sztodz', 'rb') as krrfile:
                 self.krr_o = pickle.load(krrfile)
@@ -137,7 +137,7 @@ class SiestaH2O(Siesta):
 #                              'DM.FormattedFiles': 'True',
                               'DM.UseSaveDM': 'True',
                               'SaveRhoXC': 'True'}
-        if basis == 'sz':
+        if basis != 'dz' and basis != 'qz':
             fdf_arguments['SolutionMethod'] = 'OMM'
 
         self.set_fdf_arguments(fdf_arguments)
