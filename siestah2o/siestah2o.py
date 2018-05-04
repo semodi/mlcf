@@ -101,11 +101,6 @@ class SiestaH2O(Siesta):
                energy_shift=0.02 * Ry,
                basis_set = basis.upper())
 
-            with open(krr_path +'krr_Oxygen_sztodz', 'rb') as krrfile:
-                self.krr_o = pickle.load(krrfile)
-
-            with open(krr_path +'krr_Hydrogen_sztodz', 'rb') as krrfile:
-                self.krr_h = pickle.load(krrfile)
         else: 
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -118,13 +113,21 @@ class SiestaH2O(Siesta):
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
 
+        if 'sz' in basis.lower():
+            with open(krr_path +'krr_Oxygen_{}todz'.format(basis.lower()), 'rb') as krrfile:
+                self.krr_o = pickle.load(krrfile)
+
+            with open(krr_path +'krr_Hydrogen_{}todz'.format(basis.lower()),'rb') as krrfile:
+                self.krr_h = pickle.load(krrfile)
+        elif 'dz' in basis.lower():
             with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
                 self.krr_o = pickle.load(krrfile)
 
             with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
-                self.krr_h = pickle.load(krrfile)
+                self.krr_h = pickle.load(krrfile) 
+        elif corrected:
+            raise Exception('No ML model for given basis set')
 
-       
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
         self.allowed_keywords = allowed_keys
@@ -137,6 +140,7 @@ class SiestaH2O(Siesta):
 #                              'DM.FormattedFiles': 'True',
                               'DM.UseSaveDM': 'True',
                               'SaveRhoXC': 'True'}
+
         if basis != 'dz' and basis != 'qz':
             fdf_arguments['SolutionMethod'] = 'OMM'
 
