@@ -99,7 +99,7 @@ class SiestaH2O(Siesta):
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
-               basis_set = basis)
+               basis_set = basis.upper())
 
             with open(krr_path +'krr_Oxygen_sztodz', 'rb') as krrfile:
                 self.krr_o = pickle.load(krrfile)
