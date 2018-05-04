@@ -5,6 +5,7 @@ from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from mbpol_calculator import MbpolCalculator
 from ase.units import Ry, kB
 import os
+import numpy as np
 
 os.chdir('test_run')
 a = 15.646 
@@ -14,7 +15,7 @@ os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
 
 
 h2o = Atoms('128OHH',
-            positions = np.genfromtxt('128.csv',delimiter = ','),
+            positions = np.genfromtxt('../128.csv',delimiter = ','),
             cell = [a, a, a],
             pbc = True)
 
