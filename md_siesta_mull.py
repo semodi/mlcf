@@ -14,6 +14,7 @@ import os
 import ipyparallel as ipp
 import time
 from siestah2o import MullikenGetter
+import pickle
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'

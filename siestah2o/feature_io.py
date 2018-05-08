@@ -1,7 +1,9 @@
 import sys
 import os
 from .timer import Timer
+from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
 import time
+from xcml import load_network, box_fast, fold_back_coords
 import numpy as np
 import pickle
 import siesta_utils.grid as siesta
@@ -65,7 +67,7 @@ class MullikenGetter(FeatureGetter):
         # ========== Use if mulliken population non-oriented ======
 
         time_ML = Timer("TIME_IO")
-        M = find_mulliken('H2O.out', n_mol, n_o_orb= self.n_o_orb,
+        M = find_mulliken('H2O.out', self.n_mol, n_o_orb= self.n_o_orb,
           n_h_orb = self.n_h_orb)
         time_ML.stop()
         

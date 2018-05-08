@@ -135,7 +135,7 @@ class SiestaH2O(Siesta):
                               'DM.NumberPulay': 3,
                               'DM.Tolerance': 1e-4,
                               'ElectronicTemperature': 5e-3,
-#                              'WriteMullikenPop': 1,
+                              'WriteMullikenPop': 1,
 #                              'DM.FormattedFiles': 'True',
                               'DM.UseSaveDM': 'True',
                               'SaveRhoXC': 'True'}
@@ -184,7 +184,7 @@ class SiestaH2O(Siesta):
 
     def get_potential_energy(self, atoms, force_consistent = False):
         if self.calculation_required(atoms):
-            atoms.set_positions(atoms.get_positions(wrap = True)
+            atoms.set_positions(atoms.get_positions(wrap = True))
             self.nn_model = load_network(nn_path) # TEMP FIX 
             time_step = Timer("TIME_FULL_STEP") 
             n_mol = int(len(atoms)/3)
@@ -207,6 +207,8 @@ class SiestaH2O(Siesta):
                 time_ML = Timer("TIME_ML")
                 correction = use_model_descr(features.reshape(1,-1), n_mol,
                      nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
+                siesta.unitcell = np.zeros([3,3])
+                siesta.unitcell[0, 0] = atoms.get_cell()[0, 0] #TEMP FIX
 
                 if self.use_fd:
                     correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
