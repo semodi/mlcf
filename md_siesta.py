@@ -97,7 +97,8 @@ if __name__ == '__main__':
     os.environ['SIESTA_COMMAND'] =\
          'mpirun -n {} siesta < ./%s > ./%s'.format(os.environ['PBS_NP'])
 
-    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, corrected = corrected, use_fd = use_fd)
+    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, corrected = corrected,
+                         log_accuracy = True, use_fd = use_fd)
 
     if n_clients > 1:
         descr_getter = DescriptorGetter(client)

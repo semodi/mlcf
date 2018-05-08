@@ -56,6 +56,77 @@ def get_binned(indices, traj_path, bins, a = 0):
     
     return r_oo/norm
 
+def get_binned_oh(indices, traj_path, bins, a = 0):
+    import numpy as np 
+    import pandas as pd 
+    from ase import Atoms
+    from ase import Atom
+    from ase.io import read
+    from ase.io import iread
+    from ase.io import write
+    from ase.io.trajectory import TrajectoryReader
+    import os
+
+    def binned_distance(dist, bins):
+        binned = np.zeros(len(bins)-1)
+        binned += np.histogram(dist, bins)[0]
+        return binned 
+
+    dr = 0.05
+    bins = np.arange(0,8,dr)
+
+    r_oo = np.zeros(len(bins) - 1)
+    
+    for i in indices:
+        traj = read(traj_path, index = i)
+        if a > 0:
+            traj.cell = [a,a,a]
+            traj.pbc = True
+        print(traj)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,1::3], bins)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,2::3], bins)
+        
+    g_avg = .5*128*(127)/(15.646**3)
+    n_obs = len(indices)
+    norm = bins[:-1]**2 * g_avg * n_obs * 4 * np.pi * dr
+    
+    return r_oo/norm
+
+def get_binned_hh(indices, traj_path, bins, a = 0):
+    import numpy as np 
+    import pandas as pd 
+    from ase import Atoms
+    from ase import Atom
+    from ase.io import read
+    from ase.io import iread
+    from ase.io import write
+    from ase.io.trajectory import TrajectoryReader
+    import os
+
+    def binned_distance(dist, bins):
+        binned = np.zeros(len(bins)-1)
+        binned += np.histogram(dist, bins)[0]
+        return binned 
+
+    dr = 0.05
+    bins = np.arange(0,8,dr)
+
+    r_oo = np.zeros(len(bins) - 1)
+    
+    for i in indices:
+        traj = read(traj_path, index = i)
+        if a > 0:
+            traj.cell = [a,a,a]
+            traj.pbc = True
+        print(traj)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[1::3,2::3], bins)
+    
+    g_avg = .5*128*(127)/(15.646**3)
+    n_obs = len(indices)
+    norm = bins[:-1]**2 * g_avg * n_obs * 4 * np.pi * dr
+    
+    return r_oo/norm
+
 def get_roo(basepath, start = 100, dt = 1, block_size = 1):
     
     logfile = pd.read_csv(basepath + '.log', delim_whitespace=True)
@@ -68,6 +139,34 @@ def get_roo(basepath, start = 100, dt = 1, block_size = 1):
     indices = indices.reshape(-1, dt_per_block)
 
     r_oo = view.map_sync(get_binned, indices, [traj_path]*len(indices), [bins]*len(indices))
+    return np.array(r_oo)
+
+def get_roh(basepath, start = 100, dt = 1, block_size = 1):
+    
+    logfile = pd.read_csv(basepath + '.log', delim_whitespace=True)
+    traj_path = basepath + '.traj'
+    bins = np.arange(2,8,dr)
+    dt_per_block = int(block_size/dt)
+    end = int((len(logfile) - start)/block_size) * block_size + start
+
+    indices = np.array(range(start,end,dt))
+    indices = indices.reshape(-1, dt_per_block)
+
+    r_oo = view.map_sync(get_binned_oh, indices, [traj_path]*len(indices), [bins]*len(indices))
+    return np.array(r_oo)
+
+def get_rhh(basepath, start = 100, dt = 1, block_size = 1):
+    
+    logfile = pd.read_csv(basepath + '.log', delim_whitespace=True)
+    traj_path = basepath + '.traj'
+    bins = np.arange(2,8,dr)
+    dt_per_block = int(block_size/dt)
+    end = int((len(logfile) - start)/block_size) * block_size + start
+
+    indices = np.array(range(start,end,dt))
+    indices = indices.reshape(-1, dt_per_block)
+
+    r_oo = view.map_sync(get_binned_hh, indices, [traj_path]*len(indices), [bins]*len(indices))
     return np.array(r_oo)
 
 def get_roo_xyz(basepath, a, start = 100, dt = 1, block_size = 1):
