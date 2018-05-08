@@ -1,6 +1,6 @@
 import sys
 import os
-from timer import Timer
+from .timer import Timer
 import time
 import numpy as np
 import pickle
@@ -38,7 +38,14 @@ class FeatureGetter():
             self.view = DummyView()
             self.n_clients = 1
 
-#    def get_features(self):
+class MullikenGetter(FeatureGetter):
+
+    def __init__(self, n_mol, client = None):
+        # client = parallel.Client(profile='default')
+        super().__init__(n_mol, n_o_orb = 13, n_h_orb= 5, client = client)
+        self.n_o_orb = 13
+
+    def get_features(self, *args):
 #
 #        # ========== Use if mulliken population oriented =========
 #
@@ -55,22 +62,22 @@ class FeatureGetter():
 #        M = np.concatenate(M, axis = 1)
 #        time_getM.stop()
 #
-#        # ========== Use if mulliken population non-oriented ======
-#
-#        # time_ML = Timer("TIME_ML")
-#        # M = find_mulliken('H2O.out', n_mol, n_o_orb= self.n_o_orb,
-#        #   n_h_orb = self.n_h_orb)
-#        # time_ML.stop()
-#        #
-#        return M, self.n_o_orb, self.n_h_orb
-#
+        # ========== Use if mulliken population non-oriented ======
+
+        time_ML = Timer("TIME_IO")
+        M = find_mulliken('H2O.out', n_mol, n_o_orb= self.n_o_orb,
+          n_h_orb = self.n_h_orb)
+        time_ML.stop()
+        
+        return M, self.n_o_orb, self.n_h_orb
+
 #    def __single_thread(self, DMS, n_mol, which_mol, cwd):
 #        from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
 #        basis = find_basis(cwd + "/H2O.out")
 #        M = getM_from_DMS(DMS, positions,
 #                    n_mol, basis, which_mol)
 #        return M
-#
+
 def single_thread_descriptors(coords, rho_list, grid, uc, basis):
     import os 
     os.environ['QT_QPA_PLATFORM']='offscreen'

@@ -4,8 +4,8 @@ from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS
 from xcml.misc import use_model_descr, use_force_model_fd
 from xcml import load_network, box_fast, fold_back_coords
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
-from timer import Timer
-from feature_io import FeatureGetter, DescriptorGetter
+from .timer import Timer
+from .feature_io import FeatureGetter, DescriptorGetter, MullikenGetter
 try:
     from ase.calculators.siesta.parameters import Species
 except ImportError:
@@ -26,8 +26,9 @@ os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
 #nn_path = '/home/sebastian/Documents/Code/exchange_ml/models/final/nn_mulliken_descriptors_dz/'
 #krr_path = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
 
-nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_descriptors_dz/'
+#nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_descriptors_dz/'
 krr_path = '/gpfs/home/smdick/exchange_ml/models/final/'
+nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_dz_rand/'
 
 offset_nn = (-469.766523)
 
@@ -183,6 +184,7 @@ class SiestaH2O(Siesta):
 
     def get_potential_energy(self, atoms, force_consistent = False):
         if self.calculation_required(atoms):
+            atoms.set_positions(atoms.get_positions(wrap = True)
             self.nn_model = load_network(nn_path) # TEMP FIX 
             time_step = Timer("TIME_FULL_STEP") 
             n_mol = int(len(atoms)/3)
