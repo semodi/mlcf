@@ -25,7 +25,7 @@ for key in par['descr']['krr_o']:
 par['descr']['krr_o_dx'] = {'dz_custom': 'krr_dx_O_descriptors',
                             'dzp': 'krr_dx_O_descriptors'}
 
-par['descr']['krr_o_dx'] = {'dz_custom': 'krr_dx_H_descriptors',
+par['descr']['krr_h_dx'] = {'dz_custom': 'krr_dx_H_descriptors',
                             'dzp': 'krr_dx_H_descriptors'}
 
 #================= Mulliken models =======================

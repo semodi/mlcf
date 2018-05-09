@@ -17,6 +17,7 @@ from ase.io import Trajectory
 import numpy as np
 import pickle
 import siesta_utils.grid as siesta
+from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
 
 offset_nn = (-469.766523)
@@ -202,7 +203,7 @@ class SiestaH2O(Siesta):
                 else:
                     correction = 0
                 siesta.unitcell = np.zeros([3,3])
-                siesta.unitcell[0, 0] = atoms.get_cell()[0, 0] #TEMP FIX
+                siesta.unitcell[0, 0] = atoms.get_cell()[0, 0]*AtoBohr #TEMP FIX
 
                 if self.use_fd:
                     if not self.corrected_e:

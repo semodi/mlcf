@@ -154,9 +154,9 @@ if __name__ == '__main__':
                 raise Exception('Error: no force model found. Aborting...')
         elif e_model_found:
             try:
-                krr_o_dx = pickle.load(open(model_basepath + config.par[args.features]['krr_o_dx'][args.basis.lower()], 'rb'))
-                krr_h_dx = pickle.load(open(model_basepath + config.par[args.features]['krr_h_dx'][args.basis.lower()], 'rb'))
-                h2o.calc.set_fd_model(krr_o, krr_h)
+                krr_o_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o_dx'][args.basis.lower()], 'rb'))
+                krr_h_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h_dx'][args.basis.lower()], 'rb'))
+                h2o.calc.set_fd_model(krr_o_dx, krr_h_dx)
                 fd_model_found = True
             except KeyError:
                 raise Exception('Error: no finite difference model found. Aborting...')
