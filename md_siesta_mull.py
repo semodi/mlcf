@@ -14,6 +14,7 @@ import os
 import ipyparallel as ipp
 import time
 from siestah2o import MullikenGetter
+import pickle
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -102,12 +103,13 @@ if __name__ == '__main__':
     h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, corrected = corrected, use_fd = use_fd,
                         log_accuracy = True)
 
-    if n_clients > 1:
-        descr_getter = DescriptorGetter(client)
-    else:
-        descr_getter = DescriptorGetter()
 
-    h2o.calc.set_feature_getter(descr_getter)
+    mull_getter = MullikenGetter(128)
+
+    h2o.calc.set_feature_getter(mull_getter)
+
+    h2o.calc.krr_o = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/krr_Oxygen_rand', 'rb'))
+    h2o.calc.krr_h = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/krr_Hydrogen_rand', 'rb'))
 
     temperature = args.T * ase_units.kB
 
