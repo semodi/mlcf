@@ -129,6 +129,7 @@ class SiestaH2O(Siesta):
         self.forces = 0
         self.feature_getter = feature_getter
         self.log_accuracy = log_accuracy
+        self.symmetry = 0
         if self.log_accuracy:
             log_all()
 
@@ -155,6 +156,12 @@ class SiestaH2O(Siesta):
         self.krr_h_dx = krr_h_dx
         self.use_fd = True
         self.corrected_f = True
+
+    def set_symmetry(self, sym):
+        if not isinstance(sym, np.ndarray):
+            raise Exception('sym must be np.ndarray')
+        else:
+            self.symmetry = sym
 
     def read_eigenvalues(self):
         pass
@@ -199,7 +206,7 @@ class SiestaH2O(Siesta):
                 if self.corrected_e:
                     self.nn_model = load_network(self.nn_path) # TEMP FIX
                     correction = use_model_descr(features.reshape(1,-1), n_mol,
-                         nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
+                         nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, sym = self.symmetry)[0]
                 else:
                     correction = 0
                 siesta.unitcell = np.zeros([3,3])
@@ -211,11 +218,11 @@ class SiestaH2O(Siesta):
                     correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
                         self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
                         coords = fold_back_coords(atoms.get_positions(), siesta),
-                        direction_factor = 1e4)
+                        direction_factor = 1e4, sym = self.symmetry)
                 elif self.corrected_f:
                     correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
-                        coords = fold_back_coords(atoms.get_positions(), siesta))
+                        coords = fold_back_coords(atoms.get_positions(), siesta), sym = self.symmetry)
                 else:
                     correction_force = np.zeros_like(forces)
 

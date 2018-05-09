@@ -1,3 +1,4 @@
+import numpy as np 
 par = {}
 model_basepath = '/gpfs/home/smdick/exchange_ml/models/final/'
 #model_basepath = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
@@ -7,11 +8,12 @@ par['mull'] = {}
 #=============== Descriptor models ===================
 
 #---- Energy -----
-par['descr']['nn'] = {'dz_custom': 'nn_mulliken_descriptors_dz',
+par['descr']['nn'] = {'dz_custom': 'nn_descriptors_dz_symright',
                       'qz_custom': 'nn_mulliken_symright_3_8_1e7',
                       'sz': 'nn_descriptors_sztoqz',
                       'szp': 'nn_descriptors_szp',
-                      'dzp': 'nn_mulliken_descriptors_dz'}
+                      'dzp': 'nn_descriptors_dz_symright'}
+
 #---- read_forces_stress -----
 par['descr']['krr_o'] = {'dz_custom': 'krr_Oxygen_descr',
                          'sz': 'krr_Oxygen_sztodz',
@@ -22,11 +24,15 @@ for key in par['descr']['krr_o']:
     par['descr']['krr_h'][key] = par['descr']['krr_o'][key].replace('Oxygen','Hydrogen')
 
 #---- Finite difference -----
+
 par['descr']['krr_o_dx'] = {'dz_custom': 'krr_dx_O_descriptors',
                             'dzp': 'krr_dx_O_descriptors'}
 
 par['descr']['krr_h_dx'] = {'dz_custom': 'krr_dx_H_descriptors',
                             'dzp': 'krr_dx_H_descriptors'}
+
+#---- Symmetry factor for force model ------
+par['descr']['sym'] = np.genfromtxt('symmetry.dat')
 
 #================= Mulliken models =======================
 

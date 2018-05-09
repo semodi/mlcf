@@ -129,6 +129,8 @@ if __name__ == '__main__':
             else:
                 descr_getter = DescriptorGetter()
             h2o.calc.set_feature_getter(descr_getter)
+            h2o.calc.set_symmetry(config.par['descr']['sym'])
+
         elif args.features == 'mull':
             mull_getter = MullikenGetter(128)
             try:
