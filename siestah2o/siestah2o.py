@@ -18,21 +18,10 @@ import numpy as np
 import pickle
 import siesta_utils.grid as siesta
 import ipyparallel as parallel
-#os.environ['SIESTA_COMMAND'] = 'mpirun -n 16 siesta < ./%s > ./%s'
-#os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
-os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
-#os.environ['QT_QPA_PLATFORM']='offscreen'
-
-#nn_path = '/home/sebastian/Documents/Code/exchange_ml/models/final/nn_mulliken_descriptors_dz/'
-#krr_path = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
-
-#nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_descriptors_dz/'
-krr_path = '/gpfs/home/smdick/exchange_ml/models/final/'
-nn_path = '/gpfs/home/smdick/exchange_ml/models/final/nn_mulliken_dz_rand/'
 
 offset_nn = (-469.766523)
 
-basis_sets = {'o_basis_qz' : """ 3
+basis_sets = {'o_basis_qz_custom' : """ 3
 n=2 0 4 E 50. 7.5
     8.0 5.0 3.5 2.0
 n=2 1 4 E 10. 8.3
@@ -40,13 +29,13 @@ n=2 1 4 E 10. 8.3
 n=3 2 2 E 40. 8.3 Q 6.
     8.5 2.2""",
 
-'h_basis_qz' : """ 2
+'h_basis_qz_custom' : """ 2
 n=1 0 4 E 50. 8.3
     8.5 5.0 3.5 2.0
 n=2 1 2 E 20. 7.8 Q 3.5
     8.0 2.0""",
 
-'o_basis_dz': """    3     -0.24233
+'o_basis_dz_custom': """    3     -0.24233
 n=2   0   2   E    23.36061     3.39721
      4.50769     2.64066
      1.00000     1.00000
@@ -57,7 +46,7 @@ n=3   2   1   E    63.98188     0.16104
      3.54403
      1.00000""",
 
-'h_basis_dz': """2      0.46527
+'h_basis_dz_custom': """2      0.46527
 n=1   0   2   E    99.93138     2.59932
      4.20357     1.84463
      1.00000     1.00000
@@ -87,20 +76,19 @@ def log_all(energy_siesta = None, energy_corrected = None,
         with open('features.dat', 'a') as file:
             np.savetxt(file, features, fmt = '%.4f')
 
-    
+
 
 class SiestaH2O(Siesta):
 
-    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, corrected = True, log_accuracy = False, use_fd = False):
+    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
 
-        if basis != 'dz' and basis != 'qz':
+        if not 'custom' in basis.lower():
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
                basis_set = basis.upper())
-
-        else: 
+        else:
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
             species_h = Species(symbol= 'H',
@@ -111,21 +99,6 @@ class SiestaH2O(Siesta):
                mesh_cutoff=200 * Ry,
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-
-        if 'sz' in basis.lower():
-            with open(krr_path +'krr_Oxygen_{}todz'.format(basis.lower()), 'rb') as krrfile:
-                self.krr_o = pickle.load(krrfile)
-
-            with open(krr_path +'krr_Hydrogen_{}todz'.format(basis.lower()),'rb') as krrfile:
-                self.krr_h = pickle.load(krrfile)
-        elif 'dz' in basis.lower():
-            with open(krr_path +'krr_Oxygen_descr', 'rb') as krrfile:
-                self.krr_o = pickle.load(krrfile)
-
-            with open(krr_path +'krr_Hydrogen_descr', 'rb') as krrfile:
-                self.krr_h = pickle.load(krrfile) 
-        elif corrected:
-            raise Exception('No ML model for given basis set')
 
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
@@ -141,28 +114,46 @@ class SiestaH2O(Siesta):
                               'DM.UseSaveDM': 'True',
                               'SaveRhoXC': 'True'}
 
-        if basis != 'dz' and basis != 'qz':
-            fdf_arguments['SolutionMethod'] = 'OMM'
-
+        self.krr_o = None
+        self.krr_h = None
+        self.krr_o_dx = None
+        self.krr_h_dx = None
         self.set_fdf_arguments(fdf_arguments)
-        self.nn_model = load_network(nn_path)
-        self.use_fd = use_fd
-
-        with open(krr_path +'krr_dx_O_descriptors', 'rb') as krrfile:
-            self.krr_o_dx = pickle.load(krrfile)
-
-        with open(krr_path +'krr_dx_H_descriptors', 'rb') as krrfile:
-            self.krr_h_dx = pickle.load(krrfile)
-        
-
+        self.nn_path = ''
+        self.corrected_e = False
+        self.corrected_f = False
+        self.use_fd = False
         self.last_positions = None
         self.Epot = 0
         self.forces = 0
         self.feature_getter = feature_getter
-        self.corrected = corrected
         self.log_accuracy = log_accuracy
         if self.log_accuracy:
-            log_all() 
+            log_all()
+
+    def set_solution_method(self, method):
+        if not method.lower() == 'diagon' and not method.upper() == 'OMM':
+            raise Exception('Invalid solution method: choose "diagon" or "OMM"')
+        else:
+            fdf_arguments = self.parameters['fdf_arguments']
+            fdf_arguments['SolutionMethod'] = method
+            self.set_fdf_arguments(fdf_arguments)
+
+    def set_nn_path(self, path):
+        self.nn_path = path
+        load_network(self.nn_path)
+        self.corrected_e = True
+
+    def set_force_model(self, krr_o, krr_h):
+        self.krr_o = krr_o
+        self.krr_h = krr_h
+        self.corrected_f = True
+
+    def set_fd_model(self, krr_o_dx, krr_h_dx):
+        self.krr_o_dx = krr_o_dx
+        self.krr_h_dx = krr_h_dx
+        self.use_fd = True
+        self.corrected_f = True
 
     def read_eigenvalues(self):
         pass
@@ -186,40 +177,46 @@ class SiestaH2O(Siesta):
     def get_potential_energy(self, atoms, force_consistent = False):
         if self.calculation_required(atoms):
 #            atoms.set_positions(atoms.get_positions(wrap = True))
-            self.nn_model = load_network(nn_path) # TEMP FIX 
-            time_step = Timer("TIME_FULL_STEP") 
+
+            time_step = Timer("TIME_FULL_STEP")
             n_mol = int(len(atoms)/3)
             time_siesta = Timer("TIME_SIESTA_BARE")
-            time_siesta1 = Timer("TIME_SIESTA_1")
             pot_energy = super().get_potential_energy(atoms)
-            time_siesta1.stop()
-            time_siesta2 = Timer("TIME_SIESTA_2")
             forces = super().get_forces(atoms)
-            time_siesta2.stop()
             time_siesta.stop()
             self.last_positions = atoms.get_positions()
 
-            if self.corrected:
+            if self.corrected_e or self.corrected_f:
+
                 if self.feature_getter == None:
                     raise Exception("Feature getter not defined, cannot proceed...")
                 features, n_o_orb, n_h_orb =\
                     self.feature_getter.get_features(atoms.get_positions())
                 n_orb = n_o_orb + 2*n_h_orb
                 time_ML = Timer("TIME_ML")
-                correction = use_model_descr(features.reshape(1,-1), n_mol,
-                     nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
+
+                if self.corrected_e:
+                    self.nn_model = load_network(nn_path) # TEMP FIX
+                    correction = use_model_descr(features.reshape(1,-1), n_mol,
+                         nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
+                else:
+                    correction = 0
                 siesta.unitcell = np.zeros([3,3])
                 siesta.unitcell[0, 0] = atoms.get_cell()[0, 0] #TEMP FIX
 
                 if self.use_fd:
+                    if not self.corrected_e:
+                        raise Exception('No energy model provided for finite difference')
                     correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
                         self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
                         coords = fold_back_coords(atoms.get_positions(), siesta),
                         direction_factor = 1e4)
-                else:
+                elif self.corrected_f:
                     correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
                         coords = fold_back_coords(atoms.get_positions(), siesta))
+                else:
+                    correction_force = np.zeros_like(forces)
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
@@ -229,8 +226,8 @@ class SiestaH2O(Siesta):
                          forces + correction_force.reshape(-1,3), forces,
                          features)
             self.Epot = pot_energy
-            self.forces = forces 
-            time_step.stop() 
+            self.forces = forces
+            time_step.stop()
         return self.Epot
 
     def get_forces(self, atoms):
