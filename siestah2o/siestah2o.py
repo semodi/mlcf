@@ -221,6 +221,8 @@ class SiestaH2O(Siesta):
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces = forces - correction_force.reshape(-1,3)
+                print(forces)
+                print(pot_energy)
                 if self.log_accuracy:
                     log_all(pot_energy + correction, pot_energy,
                          forces + correction_force.reshape(-1,3), forces,
