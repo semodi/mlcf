@@ -19,8 +19,9 @@ from siestah2o import MullikenGetter
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
-# os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
-os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
+#os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+
 try:
     os.environ['SIESTA_COMMAND'] =\
              'mpirun -n {} siesta < ./%s > ./%s'.format(os.environ['PBS_NP'])

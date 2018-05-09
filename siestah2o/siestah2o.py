@@ -196,7 +196,7 @@ class SiestaH2O(Siesta):
                 time_ML = Timer("TIME_ML")
 
                 if self.corrected_e:
-                    self.nn_model = load_network(nn_path) # TEMP FIX
+                    self.nn_model = load_network(self.nn_path) # TEMP FIX
                     correction = use_model_descr(features.reshape(1,-1), n_mol,
                          nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb)[0]
                 else:

@@ -1,6 +1,6 @@
 par = {}
-# model_basepath = '/gpfs/home/smdick/exchange_ml/models/final/'
-model_basepath = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
+model_basepath = '/gpfs/home/smdick/exchange_ml/models/final/'
+#model_basepath = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
 par['descr'] = {}
 par['mull'] = {}
 
