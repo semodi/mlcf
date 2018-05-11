@@ -9,6 +9,15 @@ import pickle
 import siesta_utils.grid as siesta
 import ipyparallel as parallel
 
+
+def find_h2o(atoms):
+    atomic_numbers = atoms.get_atomic_numbers()
+    indices = []
+    for i, z in enumerate(atomic_numbers):
+        if z == 8 and atomic_numbers[i+1] == 1 and atomic_numbers[i+2] == 1:
+            indices += [i, i+1, i+2]
+    return np.array(indices)
+
 class FeatureGetter():
 
     def __init__(self, n_mol, n_o_orb = 13, n_h_orb = 5, client = None):
@@ -47,7 +56,7 @@ class MullikenGetter(FeatureGetter):
         super().__init__(n_mol, n_o_orb = 13, n_h_orb= 5, client = client)
         self.n_o_orb = 13
 
-    def get_features(self, *args):
+    def get_features(self, atoms, *args):
 #
 #        # ========== Use if mulliken population oriented =========
 #
@@ -65,13 +74,13 @@ class MullikenGetter(FeatureGetter):
 #        time_getM.stop()
 #
         # ========== Use if mulliken population non-oriented ======
-
+        h2o_indices = find_h2o(atoms)
         time_ML = Timer("TIME_IO")
-        M = find_mulliken('H2O.out', self.n_mol, n_o_orb= self.n_o_orb,
-          n_h_orb = self.n_h_orb)
+        M = find_mulliken_h2o_indices('H2O.out', self.n_mol, n_o_orb= self.n_o_orb,
+          n_h_orb = self.n_h_orb, h2o_indices)
         time_ML.stop()
-        
-        return M, self.n_o_orb, self.n_h_orb
+
+        return M, self.n_o_orb, self.n_h_orb, h2o_indices
 
 #    def __single_thread(self, DMS, n_mol, which_mol, cwd):
 #        from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
@@ -81,11 +90,11 @@ class MullikenGetter(FeatureGetter):
 #        return M
 
 def single_thread_descriptors(coords, rho_list, grid, uc, basis):
-    import os 
+    import os
     os.environ['QT_QPA_PLATFORM']='offscreen'
     import xcml
     import siesta_utils.grid as siesta
-    
+
     siesta.grid = grid
     siesta.unitcell = uc
     all_descr = []
@@ -95,6 +104,8 @@ def single_thread_descriptors(coords, rho_list, grid, uc, basis):
         all_descr.append(xcml.atom_decomposition(coords, siesta, basis, al))
 
     return np.concatenate(all_descr)
+
+
 
 class DescriptorGetter(FeatureGetter):
 
@@ -107,8 +118,11 @@ class DescriptorGetter(FeatureGetter):
 
         self.single_thread = single_thread_descriptors
 
-    def get_features(self, coords):
+    def get_features(self, atoms):
         # ========== Use if mulliken population oriented =========
+        h2o_indices = find_h2o(atoms)
+        coords = atoms.get_positions()[h2o_indices]
+
         time_getfeat = Timer('TIME_GETFEAT')
         siesta.get_data_bin('./H2O.RHOXC')
         coords = coords.reshape(-1,3,3)
@@ -127,6 +141,4 @@ class DescriptorGetter(FeatureGetter):
 
         time_getfeat.stop()
         descr = np.concatenate(descr)
-        return descr, self.n_o_orb, self.n_h_orb
-
-
+        return descr, self.n_o_orb, self.n_h_orb, h2o_indices

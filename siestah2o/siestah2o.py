@@ -198,8 +198,8 @@ class SiestaH2O(Siesta):
 
                 if self.feature_getter == None:
                     raise Exception("Feature getter not defined, cannot proceed...")
-                features, n_o_orb, n_h_orb =\
-                    self.feature_getter.get_features(atoms.get_positions())
+                features, n_o_orb, n_h_orb, h2o_indices =\
+                    self.feature_getter.get_features(atoms)
                 n_orb = n_o_orb + 2*n_h_orb
                 time_ML = Timer("TIME_ML")
 
@@ -228,7 +228,7 @@ class SiestaH2O(Siesta):
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
-                forces = forces - correction_force.reshape(-1,3)
+                forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
                 print(forces)
                 print(pot_energy)
                 if self.log_accuracy:
