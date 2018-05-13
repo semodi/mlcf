@@ -47,6 +47,30 @@ n=3   2   1   E    63.98188     0.16104
      3.54403
      1.00000""",
 
+'na_basis_dz_custom': """    3    
+n=2   0   2   E    23.36061     3.39721
+     4.50769     2.64066
+     1.00000     1.00000
+n=2   1   2   E     2.78334     5.14253
+     6.14996     2.59356
+     1.00000     1.00000
+n=3   2   1   E    63.98188     0.16104
+     3.54403
+     1.00000""",
+
+
+'cl_basis_dz_custom': """    3    
+n=3   0   2   E    23.36061     3.39721
+     4.50769     2.64066
+     1.00000     1.00000
+n=3   1   2   E     2.78334     5.14253
+     6.14996     2.59356
+     1.00000     1.00000
+n=4   2   1   E    63.98188     0.16104
+     3.54403
+     1.00000""",
+
+
 'h_basis_dz_custom': """2      0.46527
 n=1   0   2   E    99.93138     2.59932
      4.20357     1.84463
@@ -84,11 +108,18 @@ class SiestaH2O(Siesta):
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
 
         if not 'custom' in basis.lower():
+            species_na = Species(symbol= 'Na',
+             basis_set = PAOBasisBlock(basis_sets['na_basis_dz_custom'.format(basis)]))
+            species_cl = Species(symbol= 'Cl',
+             basis_set = PAOBasisBlock(basis_sets['cl_basis_dz_custom'.format(basis)]))
+
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
-               basis_set = basis.upper())
+               basis_set = basis.upper(),
+               species = [species_na, species_cl])
+
         else:
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -217,23 +248,23 @@ class SiestaH2O(Siesta):
                         raise Exception('No energy model provided for finite difference')
                     correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
                         self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                        coords = fold_back_coords(atoms.get_positions(), siesta),
+                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta),
                         direction_factor = 1e4, sym = self.symmetry)
                 elif self.corrected_f:
                     correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
-                        coords = fold_back_coords(atoms.get_positions(), siesta), sym = self.symmetry)
+                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), sym = self.symmetry)
                 else:
                     correction_force = np.zeros_like(forces)
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
-                print(forces)
-                print(pot_energy)
                 if self.log_accuracy:
+                    forces_uncorrected = np.array(forces)
+                    forces_uncorrected[h2o_indices] += correction_force.reshape(-1,3)
                     log_all(pot_energy + correction, pot_energy,
-                         forces + correction_force.reshape(-1,3), forces,
+                         forces_uncorrected, forces,
                          features)
             self.Epot = pot_energy
             self.forces = forces

@@ -1,7 +1,7 @@
 import sys
 import os
 from .timer import Timer
-from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model
+from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model, find_mulliken_h2o_indices
 import time
 from xcml import load_network, box_fast, fold_back_coords
 import numpy as np
@@ -77,7 +77,7 @@ class MullikenGetter(FeatureGetter):
         h2o_indices = find_h2o(atoms)
         time_ML = Timer("TIME_IO")
         M = find_mulliken_h2o_indices('H2O.out', self.n_mol, n_o_orb= self.n_o_orb,
-          n_h_orb = self.n_h_orb, h2o_indices)
+          n_h_orb = self.n_h_orb, h2o_indices = h2o_indices)
         time_ML.stop()
 
         return M, self.n_o_orb, self.n_h_orb, h2o_indices
