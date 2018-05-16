@@ -11,7 +11,7 @@ class Mixer(Siesta):
         except FileExistsError:
             pass
 
-
+        super().__init__(label = 'H2O')
         self.fast_calculator = fast_calculator
         self.slow_calculator = slow_calculator
         self.n = n 
@@ -38,9 +38,11 @@ class Mixer(Siesta):
             self.forces = f_fast
             return self.fast_calculator.get_potential_energy(atoms)
 
+    def increment_step(self):
+        self.step += 1
+
     def get_forces(self, atoms):
         self.get_potential_energy(atoms)
-        self.step += 1
         return self.forces
 
 

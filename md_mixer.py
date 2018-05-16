@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('-restart', metavar='restart', type=str, nargs= '?', default='n', help='Restart recent calculation')
     parser.add_argument('-features', metavar='features', type=str, nargs='?', default='descr', help='descr/mull')
     parser.add_argument('-solutionmethod', metavar='solutionmethod', type=str, nargs='?', default='diagon', help='diagon/OMM')
+    parser.add_argument('-mix_n', metavar='mix_n', type=int, nargs='?', default='5', help='Mixing steps')
 
     args = parser.parse_args()
     args.xc = args.xc.upper()
@@ -192,4 +193,5 @@ if __name__ == '__main__':
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
+        h2o.calc.increment_step()
         time_step.stop()
