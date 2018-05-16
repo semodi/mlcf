@@ -72,7 +72,7 @@ def get_binned_oh(indices, traj_path, bins, a = 0):
         binned += np.histogram(dist, bins)[0]
         return binned 
 
-    dr = 0.05
+    dr = 0.02
     bins = np.arange(0,8,dr)
 
     r_oo = np.zeros(len(bins) - 1)
@@ -108,7 +108,7 @@ def get_binned_hh(indices, traj_path, bins, a = 0):
         binned += np.histogram(dist, bins)[0]
         return binned 
 
-    dr = 0.05
+    dr = 0.02
     bins = np.arange(0,8,dr)
 
     r_oo = np.zeros(len(bins) - 1)

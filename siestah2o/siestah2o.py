@@ -82,13 +82,22 @@ def log_all(energy_siesta = None, energy_corrected = None,
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
-
-        if not 'custom' in basis.lower():
+        
+        if basis == 'uf':
+            super().__init__(label='H2O',
+               xc='PBE',
+               mesh_cutoff=100 * Ry,
+               energy_shift=0.02 * Ry,
+               basis_set = 'SZ')
+            dmtol = 5e-4
+        
+        elif not 'custom' in basis.lower():
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
                basis_set = basis.upper())
+            dmtol = 1e-4
         else:
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -100,14 +109,14 @@ class SiestaH2O(Siesta):
                mesh_cutoff=200 * Ry,
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-
+            dmtol = 1e-4
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
         self.allowed_keywords = allowed_keys
         fdf_arguments = {'DM.MixingWeight': 0.3,
                               'MaxSCFIterations': 50,
                               'DM.NumberPulay': 3,
-                              'DM.Tolerance': 1e-4,
+                              'DM.Tolerance': dmtol,
                               'ElectronicTemperature': 5e-3,
                               'WriteMullikenPop': 1,
 #                              'DM.FormattedFiles': 'True',

@@ -18,7 +18,9 @@ par['descr']['nn'] = {'dz_custom': 'nn_descriptors_dz_symright',
 par['descr']['krr_o'] = {'dz_custom': 'krr_Oxygen_descr',
                          'sz': 'krr_Oxygen_sztodz',
                          'szp': 'krr_Oxygen_szptodz',
-                         'dzp': 'krr_Oxygen_descr'}
+                         'dzp': 'krr_Oxygen_descr',
+                         'uf' : 'krr_Oxygen_descr_uftodzp'}
+
 par['descr']['krr_h'] = {}
 for key in par['descr']['krr_o']:
     par['descr']['krr_h'][key] = par['descr']['krr_o'][key].replace('Oxygen','Hydrogen')
