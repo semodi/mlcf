@@ -47,30 +47,6 @@ n=3   2   1   E    63.98188     0.16104
      3.54403
      1.00000""",
 
-'na_basis_dz_custom': """    3    
-n=2   0   2   E    23.36061     3.39721
-     4.50769     2.64066
-     1.00000     1.00000
-n=2   1   2   E     2.78334     5.14253
-     6.14996     2.59356
-     1.00000     1.00000
-n=3   2   1   E    63.98188     0.16104
-     3.54403
-     1.00000""",
-
-
-'cl_basis_dz_custom': """    3    
-n=3   0   2   E    23.36061     3.39721
-     4.50769     2.64066
-     1.00000     1.00000
-n=3   1   2   E     2.78334     5.14253
-     6.14996     2.59356
-     1.00000     1.00000
-n=4   2   1   E    63.98188     0.16104
-     3.54403
-     1.00000""",
-
-
 'h_basis_dz_custom': """2      0.46527
 n=1   0   2   E    99.93138     2.59932
      4.20357     1.84463
@@ -108,18 +84,11 @@ class SiestaH2O(Siesta):
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
 
         if not 'custom' in basis.lower():
-            species_na = Species(symbol= 'Na',
-             basis_set = PAOBasisBlock(basis_sets['na_basis_dz_custom'.format(basis)]))
-            species_cl = Species(symbol= 'Cl',
-             basis_set = PAOBasisBlock(basis_sets['cl_basis_dz_custom'.format(basis)]))
-
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
-               basis_set = basis.upper(),
-               species = [species_na, species_cl])
-
+               basis_set = basis.upper())
         else:
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
