@@ -82,7 +82,17 @@ def log_all(energy_siesta = None, energy_corrected = None,
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
-        
+
+        fdf_arguments = {'DM.MixingWeight': 0.3,
+                              'MaxSCFIterations': 50,
+                              'DM.NumberPulay': 3,
+                              'ElectronicTemperature': 5e-3,
+                              'WriteMullikenPop': 1,
+#                              'DM.FormattedFiles': 'True',
+                              'MaxSCFIterations': 20,
+                              'SaveRhoXC': 'True'}
+
+
         if basis == 'uf':
             super().__init__(label='H2O',
                xc='PBE',
@@ -107,23 +117,21 @@ class SiestaH2O(Siesta):
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
+               basis_set = 'DZP',
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
             dmtol = 1e-4
+            fdf_arguments['PAO.SplitNorm'] = 0.15
+            fdf_arguments['PAO.SoftDefault'] =  'True'
+            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
+            fdf_arguments['PAO.SoftPotential'] = 1
+
+        fdf_arguments['DM.UseSaveDM'] = 'True'
+        fdf_arguments['DM.Tolerance'] = dmtol
+
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
         self.allowed_keywords = allowed_keys
-        fdf_arguments = {'DM.MixingWeight': 0.3,
-                              'MaxSCFIterations': 50,
-                              'DM.NumberPulay': 3,
-                              'DM.Tolerance': dmtol,
-                              'ElectronicTemperature': 5e-3,
-                              'WriteMullikenPop': 1,
-#                              'DM.FormattedFiles': 'True',
-                              'MaxSCFIterations': 20,
-                              'DM.UseSaveDM': 'True',
-                              'SaveRhoXC': 'True'}
-
         self.krr_o = None
         self.krr_h = None
         self.krr_o_dx = None
