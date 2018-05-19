@@ -15,7 +15,8 @@ import ipyparallel as ipp
 import time
 import config
 import pickle
-from siestah2o import MullikenGetter, Mixer
+from siestah2o import MullikenGetter
+from siestah2o import Mixer_alt as Mixer
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
