@@ -2,6 +2,7 @@ import sys
 import os
 import shutil
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
+import numpy as np
 
 class Mixer(Siesta):
 
@@ -31,10 +32,57 @@ class Mixer(Siesta):
 
             f_slow = self.slow_calculator.get_forces(atoms)
             self.forces = f_fast + self.n * (f_slow - f_fast)
+
+            with open('forces_mixing.dat', 'a') as file:
+                np.savetxt(file, f_slow - f_fast, fmt = '%.4f')
+
             shutil.copy('H2O.DM','DM_save/DM.slow')
             shutil.copy('DM_save/DM.fast', 'H2O.DM')
             return self.slow_calculator.get_potential_energy(atoms)
         else:
+            self.forces = f_fast
+            return self.fast_calculator.get_potential_energy(atoms)
+
+    def increment_step(self):
+        self.step += 1
+
+    def get_forces(self, atoms):
+        self.get_potential_energy(atoms)
+        return self.forces
+
+class Mixer_alt(Siesta):
+
+    def __init__(self, fast_calculator, slow_calculator, n):
+        try:
+            shutil.os.mkdir('DM_save/')
+        except FileExistsError:
+            pass
+
+        super().__init__(label = 'H2O')
+        self.fast_calculator = fast_calculator
+        self.slow_calculator = slow_calculator
+        self.n = n 
+        self.step = 1
+        self.energy = 0
+        self.forces = 0
+
+    def get_potential_energy(self, atoms, force_consistent = False):
+
+        if self.step%self.n == 0:
+            shutil.copy('H2O.DM','DM_save/DM.fast')
+            try:
+                shutil.copy('DM_save/DM.slow', 'H2O.DM')
+            except FileNotFoundError:
+                pass
+
+            f_slow = self.slow_calculator.get_forces(atoms)
+            self.forces = f_slow 
+            shutil.copy('H2O.DM','DM_save/DM.slow')
+            shutil.copy('DM_save/DM.fast', 'H2O.DM')
+            return self.slow_calculator.get_potential_energy(atoms)
+        else:
+
+            f_fast = self.fast_calculator.get_forces(atoms)
             self.forces = f_fast
             return self.fast_calculator.get_potential_energy(atoms)
 

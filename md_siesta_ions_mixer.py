@@ -1,4 +1,4 @@
-from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter
+from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter, Mixer
 import numpy as np
 from ase import Atoms
 from ase.md.npt import NPT
@@ -15,7 +15,7 @@ import ipyparallel as ipp
 import time
 import config
 import pickle
-from siestah2o import MullikenGetter, Mixer
+from siestah2o import MullikenGetter
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('-restart', metavar='restart', type=str, nargs= '?', default='n', help='Restart recent calculation')
     parser.add_argument('-features', metavar='features', type=str, nargs='?', default='descr', help='descr/mull')
     parser.add_argument('-solutionmethod', metavar='solutionmethod', type=str, nargs='?', default='diagon', help='diagon/OMM')
+
     parser.add_argument('-mix_n', metavar='mix_n', type=int, nargs='?', default='5', help='Mixing steps')
 
     args = parser.parse_args()
@@ -90,11 +91,11 @@ if __name__ == '__main__':
 
 
     # Load initial configuration
+    N_water = 96
+    a = 15.646 * (N_water/128)**(1/3)
 
-    a = 15.646
-
-    h2o = Atoms('128OHH',
-                positions = read('128.xyz').get_positions(),
+    h2o = Atoms('NaCl(OHH){}'.format(N_water),
+                positions = np.genfromtxt('NaCl98H2O.csv', delimiter = ','),
                 cell = [a, a, a],
                 pbc = True)
 
@@ -171,6 +172,7 @@ if __name__ == '__main__':
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
 
     h2o.calc = mixer_calculator
+
     temperature = args.T * ase_units.kB
 
     # Setting the initial T 100 K lower leads to faster convergence of initial oscillations
@@ -188,13 +190,6 @@ if __name__ == '__main__':
               ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
-
-    if restart: # Add hoc solution to determine at which step simulation was stopped
-        times = np.genfromtxt('Timer')  
-        mean_time = np.mean(times) 
-        for mix_i in np.arange(args.mix_n) + 1:
-            if times[-mix_i] > mean_time + 10:
-                h2o.calc.step = mix_i    
 
     time_step = Timer('Timer')
     for i in range(args.Nt):

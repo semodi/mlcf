@@ -82,7 +82,17 @@ def log_all(energy_siesta = None, energy_corrected = None,
 class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
-        
+
+        fdf_arguments = {'DM.MixingWeight': 0.3,
+                              'MaxSCFIterations': 50,
+                              'DM.NumberPulay': 3,
+                              'ElectronicTemperature': 5e-3,
+                              'WriteMullikenPop': 1,
+#                              'DM.FormattedFiles': 'True',
+                              'MaxSCFIterations': 20,
+                              'SaveRhoXC': 'True'}
+
+
         if basis == 'uf':
             super().__init__(label='H2O',
                xc='PBE',
@@ -107,23 +117,21 @@ class SiestaH2O(Siesta):
             super().__init__(label='H2O',
                xc=xc,
                mesh_cutoff=200 * Ry,
+               basis_set = 'DZP',
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
             dmtol = 1e-4
+            fdf_arguments['PAO.SplitNorm'] = 0.15
+            fdf_arguments['PAO.SoftDefault'] =  'True'
+            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
+            fdf_arguments['PAO.SoftPotential'] = 1
+
+        fdf_arguments['DM.UseSaveDM'] = 'True'
+        fdf_arguments['DM.Tolerance'] = dmtol
+
         allowed_keys = self.allowed_fdf_keywords
         allowed_keys['SaveRhoXC'] = False
         self.allowed_keywords = allowed_keys
-        fdf_arguments = {'DM.MixingWeight': 0.3,
-                              'MaxSCFIterations': 50,
-                              'DM.NumberPulay': 3,
-                              'DM.Tolerance': dmtol,
-                              'ElectronicTemperature': 5e-3,
-                              'WriteMullikenPop': 1,
-#                              'DM.FormattedFiles': 'True',
-                              'MaxSCFIterations': 20,
-                              'DM.UseSaveDM': 'True',
-                              'SaveRhoXC': 'True'}
-
         self.krr_o = None
         self.krr_h = None
         self.krr_o_dx = None
@@ -207,8 +215,8 @@ class SiestaH2O(Siesta):
 
                 if self.feature_getter == None:
                     raise Exception("Feature getter not defined, cannot proceed...")
-                features, n_o_orb, n_h_orb =\
-                    self.feature_getter.get_features(atoms.get_positions())
+                features, n_o_orb, n_h_orb, h2o_indices =\
+                    self.feature_getter.get_features(atoms)
                 n_orb = n_o_orb + 2*n_h_orb
                 time_ML = Timer("TIME_ML")
 
@@ -226,23 +234,23 @@ class SiestaH2O(Siesta):
                         raise Exception('No energy model provided for finite difference')
                     correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
                         self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                        coords = fold_back_coords(atoms.get_positions(), siesta),
+                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta),
                         direction_factor = 1e4, sym = self.symmetry)
                 elif self.corrected_f:
                     correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
-                        coords = fold_back_coords(atoms.get_positions(), siesta), sym = self.symmetry)
+                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), sym = self.symmetry)
                 else:
                     correction_force = np.zeros_like(forces)
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
-                forces = forces - correction_force.reshape(-1,3)
-                print(forces)
-                print(pot_energy)
+                forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
                 if self.log_accuracy:
+                    forces_uncorrected = np.array(forces)
+                    forces_uncorrected[h2o_indices] += correction_force.reshape(-1,3)
                     log_all(pot_energy + correction, pot_energy,
-                         forces + correction_force.reshape(-1,3), forces,
+                         forces_uncorrected, forces,
                          features)
             self.Epot = pot_energy
             self.forces = forces
