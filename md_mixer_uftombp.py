@@ -15,12 +15,12 @@ import ipyparallel as ipp
 import time
 import config
 import pickle
-from siestah2o import MullikenGetter
+from siestah2o import MullikenGetter, Mixer
+from mbpol_calculator import *
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
 os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
-os.environ['SIESTA_UTIL_FRACTIONAL'] = '/gpfs/home/smdick/siesta-4.0.1/Util/VCA/fractional'
 #os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
 
 try:
@@ -62,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('-restart', metavar='restart', type=str, nargs= '?', default='n', help='Restart recent calculation')
     parser.add_argument('-features', metavar='features', type=str, nargs='?', default='descr', help='descr/mull')
     parser.add_argument('-solutionmethod', metavar='solutionmethod', type=str, nargs='?', default='diagon', help='diagon/OMM')
+    parser.add_argument('-mix_n', metavar='mix_n', type=int, nargs='?', default='5', help='Mixing steps')
 
     args = parser.parse_args()
     args.xc = args.xc.upper()
@@ -90,11 +91,11 @@ if __name__ == '__main__':
 
 
     # Load initial configuration
-    N_water = 96
-    a = 15.646 * (N_water/128)**(1/3)
 
-    h2o = Atoms('NaCl(OHH){}'.format(N_water),
-                positions = np.genfromtxt('NaCl98H2O.csv', delimiter = ','),
+    a = 15.646
+
+    h2o = Atoms('128OHH',
+                positions = read('128.xyz').get_positions(),
                 cell = [a, a, a],
                 pbc = True)
 
@@ -149,8 +150,8 @@ if __name__ == '__main__':
 
         if not use_fd:
             try:
-                krr_o = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o'][args.basis.lower()], 'rb'))
-                krr_h = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h'][args.basis.lower()], 'rb'))
+                krr_o = pickle.load(open(config.model_basepath + 'krr_Oxygen_descr_uftombp','rb'))
+                krr_h = pickle.load(open(config.model_basepath + 'krr_Hydrogen_descr_uftombp','rb'))
                 h2o.calc.set_force_model(krr_o, krr_h)
                 f_model_found = True
             except KeyError:
@@ -166,6 +167,13 @@ if __name__ == '__main__':
         else:
             raise Exception('Error: finite difference model cannot be used as energy model not loaded')
 
+    h2o = reconnect_monomers(h2o)
+    h2o = reconnect_monomers(h2o)
+    calc_slow = MbpolCalculator(h2o)
+    calc_fast = h2o.calc
+    mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
+
+    h2o.calc = mixer_calculator
     temperature = args.T * ase_units.kB
 
     # Setting the initial T 100 K lower leads to faster convergence of initial oscillations
@@ -184,9 +192,16 @@ if __name__ == '__main__':
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 
+    if restart: # Add hoc solution to determine at which step simulation was stopped
+        times = np.genfromtxt('Timer')  
+        mean_time = np.mean(times) 
+        for mix_i in np.arange(args.mix_n) + 1:
+            if times[-mix_i] > mean_time + 10:
+                h2o.calc.step = mix_i    
+
     time_step = Timer('Timer')
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
-        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
+        h2o.calc.increment_step()
         time_step.stop()

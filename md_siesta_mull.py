@@ -133,4 +133,5 @@ if __name__ == '__main__':
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
+        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
         time_step.stop() 
