@@ -180,7 +180,7 @@ if __name__ == '__main__':
         MaxwellBoltzmannDistribution(h2o, args.T * ase_units.kB)
         print('ttime= {} fs :: temperature = {}'.format(ttime,h2o.get_temperature()))
 
-        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
+    h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
 
     traj = io.Trajectory('../md_siesta.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
@@ -196,5 +196,5 @@ if __name__ == '__main__':
         time_step.start_timer()
         dyn.run(1)
         h2o.calc.increment_step()
-        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
+#        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
         time_step.stop()
