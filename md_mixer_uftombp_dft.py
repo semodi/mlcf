@@ -120,6 +120,8 @@ if __name__ == '__main__':
 
     h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
+    calc_fast  = SiestaH2O(basis = 'uf', xc = 'pbe', log_accuracy = True)
+    calc_fast.set_solution_method(args.solutionmethod)
     if corrected:
         e_model_found = False
         f_model_found = False
@@ -132,6 +134,9 @@ if __name__ == '__main__':
                 descr_getter = DescriptorGetter()
             h2o.calc.set_feature_getter(descr_getter)
             h2o.calc.set_symmetry(config.par['descr']['sym'])
+
+            calc_fast.set_feature_getter(descr_getter)
+            calc_fast.set_symmetry(config.par['descr']['sym'])
 
         elif args.features == 'mull':
             mull_getter = MullikenGetter(128)
@@ -150,9 +155,16 @@ if __name__ == '__main__':
 
         if not use_fd:
             try:
+                krr_o = pickle.load(open(config.model_basepath +\
+                     config.par[args.features]['krr_o'][args.basis.lower()], 'rb'))
+                krr_h = pickle.load(open(config.model_basepath +\
+                     config.par[args.features]['krr_h'][args.basis.lower()], 'rb'))
+
+                h2o.calc.set_force_model(krr_o, krr_h)
+
                 krr_o = pickle.load(open(config.model_basepath + 'krr_Oxygen_descr_uftombp','rb'))
                 krr_h = pickle.load(open(config.model_basepath + 'krr_Hydrogen_descr_uftombp','rb'))
-                h2o.calc.set_force_model(krr_o, krr_h)
+                calc_fast.set_force_model(krr_o, krr_h)
                 f_model_found = True
             except KeyError:
                 raise Exception('Error: no force model found. Aborting...')
@@ -167,10 +179,7 @@ if __name__ == '__main__':
         else:
             raise Exception('Error: finite difference model cannot be used as energy model not loaded')
 
-    h2o = reconnect_monomers(h2o)
-    h2o = reconnect_monomers(h2o)
-    calc_slow = MbpolCalculator(h2o)
-    calc_fast = h2o.calc
+    calc_slow = h2o.calc
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
 
     h2o.calc = mixer_calculator
@@ -204,5 +213,4 @@ if __name__ == '__main__':
         time_step.start_timer()
         dyn.run(1)
         h2o.calc.increment_step()
-        h2o = reconnect_monomers(h2o)
         time_step.stop()
