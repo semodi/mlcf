@@ -192,17 +192,18 @@ if __name__ == '__main__':
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 
-    if restart: # Add hoc solution to determine at which step simulation was stopped
-        times = np.genfromtxt('Timer')  
-        mean_time = np.mean(times) 
-        for mix_i in np.arange(args.mix_n) + 1:
-            if times[-mix_i] > mean_time + 10:
-                h2o.calc.step = mix_i    
+#    if restart: # Add hoc solution to determine at which step simulation was stopped
+#        times = np.genfromtxt('Timer')  
+#        mean_time = np.mean(times) 
+#        for mix_i in np.arange(args.mix_n) + 1:
+#            if times[-mix_i] > mean_time + 10:
+#                h2o.calc.step = mix_i    
 
     time_step = Timer('Timer')
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
         h2o.calc.increment_step()
-        h2o = reconnect_monomers(h2o)
+#        h2o = reconnect_monomers(h2o)
+#       h2o = reconnect_monomers(h2o)
         time_step.stop()
