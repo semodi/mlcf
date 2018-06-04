@@ -1,4 +1,4 @@
-from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter
+from siestah2o import SiestaH2O,SiestaH2OAtomic, write_atoms, read_atoms, Timer, DescriptorGetter, AtomicGetter
 import numpy as np
 from ase import Atoms
 from ase.md.npt import NPT
@@ -17,6 +17,7 @@ import config
 import pickle
 from siestah2o import MullikenGetter, Mixer
 from mbpol_calculator import *
+import keras
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -118,68 +119,41 @@ if __name__ == '__main__':
 
     os.chdir('siesta/')
 
-    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, log_accuracy = True)
+    h2o.calc = SiestaH2OAtomic(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
+
     calc_fast  = SiestaH2O(basis = 'uf', xc = 'pbe', log_accuracy = True)
     calc_fast.set_solution_method(args.solutionmethod)
-    if corrected:
-        e_model_found = False
-        f_model_found = False
-        fd_model_found = False
 
-        if n_clients > 1:
-            descr_getter = DescriptorGetter(client)
-        else:
-            descr_getter = DescriptorGetter()
+    e_model_found = False
+    f_model_found = False
+    fd_model_found = False
 
-        if args.features == 'descr':
-            h2o.calc.set_feature_getter(descr_getter)
-            h2o.calc.set_symmetry(config.par['descr']['sym'])
+    if n_clients > 1:
+        descr_getter = DescriptorGetter(client)
+        atomic_getter = AtomicGetter(client)
+    else:
+        descr_getter = DescriptorGetter()
+        atomic_getter = AtomicGetter()
 
-        elif args.features == 'mull':
-            mull_getter = MullikenGetter(128)
-            try:
-                mull_getter.n_o_orb = config.par['mull']['n_o_orb'][args.basis.lower()]
-                mull_getter.n_h_orb = config.par['mull']['n_h_orb'][args.basis.lower()]
-            except KeyError:
-                print('Error: No Mulliken model available for this basis set')
-            h2o.calc.set_feature_getter(mull_getter)
+    h2o.calc.set_feature_getter(atomic_getter)
+    calc_fast.set_feature_getter(descr_getter)
 
-        calc_fast.set_feature_getter(descr_getter)
-        calc_fast.set_symmetry(config.par['descr']['sym'])
+    calc_fast.set_symmetry(config.par['descr']['sym'])
 
+    try:
+        krr_o = keras.models.load_model(config.model_basepath + 'atom_force_O')
+        krr_h = keras.models.load_model(config.model_basepath + 'atom_force_H')
 
-        try:
-            h2o.calc.set_nn_path(config.model_basepath + config.par[args.features]['nn'][args.basis.lower()])
-            e_model_found = True
-        except KeyError:
-            print('No energy model found, proceeding ...')
+        h2o.calc.set_force_model(krr_o, krr_h)
 
-        if not use_fd:
-            try:
-                krr_o = pickle.load(open(config.model_basepath +\
-                     config.par[args.features]['krr_o'][args.basis.lower()], 'rb'))
-                krr_h = pickle.load(open(config.model_basepath +\
-                     config.par[args.features]['krr_h'][args.basis.lower()], 'rb'))
+        krr_o = pickle.load(open(config.model_basepath + 'krr_Oxygen_descr_uftombp','rb'))
+        krr_h = pickle.load(open(config.model_basepath + 'krr_Hydrogen_descr_uftombp','rb'))
 
-                h2o.calc.set_force_model(krr_o, krr_h)
-
-                krr_o = pickle.load(open(config.model_basepath + 'krr_Oxygen_descr_uftombp','rb'))
-                krr_h = pickle.load(open(config.model_basepath + 'krr_Hydrogen_descr_uftombp','rb'))
-                calc_fast.set_force_model(krr_o, krr_h)
-                f_model_found = True
-            except KeyError:
-                raise Exception('Error: no force model found. Aborting...')
-        elif e_model_found:
-            try:
-                krr_o_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o_dx'][args.basis.lower()], 'rb'))
-                krr_h_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h_dx'][args.basis.lower()], 'rb'))
-                h2o.calc.set_fd_model(krr_o_dx, krr_h_dx)
-                fd_model_found = True
-            except KeyError:
-                raise Exception('Error: no finite difference model found. Aborting...')
-        else:
-            raise Exception('Error: finite difference model cannot be used as energy model not loaded')
+        calc_fast.set_force_model(krr_o, krr_h)
+        f_model_found = True
+    except KeyError:
+        raise Exception('Error: no force model found. Aborting...')
 
     calc_slow = h2o.calc
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)

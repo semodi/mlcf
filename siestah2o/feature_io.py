@@ -228,4 +228,4 @@ class AtomicGetter(FeatureGetter):
         time_getfeat.stop()
         descr = np.array(descr)
         angles = np.array(angles).reshape(-1,3)
-        return descr, self.n_o_orb, self.n_h_orb, h2o_indices
+        return descr, self.n_o_orb, self.n_h_orb, h2o_indices, angles
