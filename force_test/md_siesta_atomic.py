@@ -91,17 +91,9 @@ if __name__ == '__main__':
 
     # Load initial configuration
 
-    a = 15.646
 
-    h2o = Atoms('128OHH',
-                positions = read('128.xyz').get_positions(),
-                cell = [a, a, a],
-                pbc = True)
-
-    if restart:
-        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
-        h2o.set_positions(last_traj.get_positions())
-        h2o.set_momenta(last_traj.get_momenta())
+    h2o = read('start.traj')
+#    h2o = read('mono.traj')
 
     try:
         shutil.os.mkdir(args.dir)
@@ -154,9 +146,7 @@ if __name__ == '__main__':
     traj = io.Trajectory('../md_siesta.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
 
-    dyn = NPT(h2o, timestep = args.dt * ase_units.fs,
-              temperature =  temperature, externalstress = 0,
-              ttime = args.ttime * ase_units.fs, pfactor = None,
+    dyn = VelocityVerlet(h2o, dt = args.dt * ase_units.fs,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 

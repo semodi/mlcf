@@ -4,7 +4,7 @@ model_basepath = '/gpfs/home/smdick/exchange_ml/models/final/'
 #model_basepath = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
 par['descr'] = {}
 par['mull'] = {}
-
+par['atomic'] = {}
 #=============== Descriptor models ===================
 
 #---- Energy -----
@@ -14,12 +14,16 @@ par['descr']['nn'] = {'dz_custom': 'nn_descriptors_dz_symright',
                       'szp': 'nn_descriptors_szp',
                       'dzp': 'nn_descriptors_dz_symright'}
 
-#---- read_forces_stress -----
+#---- Forces -----
 par['descr']['krr_o'] = {'dz_custom': 'krr_Oxygen_descr',
+#par['descr']['krr_o'] = {'dz_custom': 'krr_Oxygen_dz_mono',
                          'sz': 'krr_Oxygen_sztodz',
                          'szp': 'krr_Oxygen_szptodz',
                          'dzp': 'krr_Oxygen_descr',
                          'uf' : 'krr_Oxygen_descr_uftodzp'}
+
+par['atomic']['krr_o'] = {'dz_custom': 'atom_force_O'}
+par['atomic']['krr_h'] = {'dz_custom': 'atom_force_H'}
 
 par['descr']['krr_h'] = {}
 for key in par['descr']['krr_o']:

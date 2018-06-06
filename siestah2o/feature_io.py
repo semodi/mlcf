@@ -13,6 +13,8 @@ import ipyparallel as parallel
 mask_o = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/O_mask', delimiter = ',',dtype = bool)
 mask_h = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/H_mask', delimiter = ',',dtype = bool)
 
+scaler_o = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_O', 'rb'))
+scaler_h = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_H', 'rb'))
 
 def find_h2o(atoms):
     atomic_numbers = atoms.get_atomic_numbers()
@@ -186,8 +188,14 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
             descr = descr[[0,4]]
 
         p = np.concatenate([p,descr])
+        if i == 0:
+            p = scaler_o.transform(p.reshape(1,-1)).flatten()
+        else:
+            p = scaler_h.transform(p.reshape(1,-1)).flatten()
+
         all_descr.append(p)
         all_angles.append(angles)
+
     return [np.concatenate(all_descr), np.concatenate(all_angles)]
 
 class AtomicGetter(FeatureGetter):

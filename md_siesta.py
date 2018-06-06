@@ -1,4 +1,4 @@
-from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter
+from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter, AtomicGetter, SiestaH2OAtomic
 import numpy as np
 from ase import Atoms
 from ase.md.npt import NPT
@@ -16,6 +16,7 @@ import time
 import config
 import pickle
 from siestah2o import MullikenGetter
+import keras
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -115,8 +116,11 @@ if __name__ == '__main__':
         pass
 
     os.chdir('siesta/')
-
-    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, log_accuracy = True)
+    
+    if args.features == 'atomic':
+        h2o.calc = SiestaH2OAtomic(basis = args.basis, xc = args.xc, log_accuracy = True)
+    else:
+        h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
     if corrected:
         e_model_found = False
@@ -130,6 +134,14 @@ if __name__ == '__main__':
                 descr_getter = DescriptorGetter()
             h2o.calc.set_feature_getter(descr_getter)
             h2o.calc.set_symmetry(config.par['descr']['sym'])
+
+        elif args.features == 'atomic':
+            if n_clients > 1:
+                descr_getter = AtomicGetter(client)
+            else:
+                descr_getter = AtomicGetter()
+            h2o.calc.set_feature_getter(descr_getter)
+
 
         elif args.features == 'mull':
             mull_getter = MullikenGetter(128)
@@ -148,8 +160,13 @@ if __name__ == '__main__':
 
         if not use_fd:
             try:
-                krr_o = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o'][args.basis.lower()], 'rb'))
-                krr_h = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h'][args.basis.lower()], 'rb'))
+                if args.features == 'atomic':
+                    krr_o = keras.models.load_model(config.model_basepath + config.par[args.features]['krr_o'][args.basis.lower()])
+                    krr_h = keras.models.load_model(config.model_basepath + config.par[args.features]['krr_h'][args.basis.lower()])
+                else:
+                    krr_o = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o'][args.basis.lower()], 'rb'))
+                    krr_h = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h'][args.basis.lower()], 'rb'))
+
                 h2o.calc.set_force_model(krr_o, krr_h)
                 f_model_found = True
             except KeyError:

@@ -90,18 +90,9 @@ if __name__ == '__main__':
 
     # Load initial configuration
 
-    a = 20.0
 
-    h2o = Atoms('2OHH',
-                positions = read('hbond.xyz',index = 15).get_positions(),
-                cell = [a, a, a],
-                pbc = True)
-
-    if restart:
-        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
-        h2o.set_positions(last_traj.get_positions())
-        h2o.set_momenta(last_traj.get_momenta())
-
+#    h2o = read('start.traj')
+    h2o = read('mono.traj')
     try:
         shutil.os.mkdir(args.dir)
     except FileExistsError:
