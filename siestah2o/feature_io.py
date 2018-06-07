@@ -3,7 +3,7 @@ import os
 from .timer import Timer
 from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model, find_mulliken_h2o_indices
 import time
-from xcml import load_network, box_fast, fold_back_coords
+from xcml import load_network, box_fast, fold_back_coords, rotate_vector_real
 import numpy as np
 import pickle
 import siesta_utils.grid as siesta
@@ -13,8 +13,8 @@ import ipyparallel as parallel
 mask_o = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/O_mask', delimiter = ',',dtype = bool)
 mask_h = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/H_mask', delimiter = ',',dtype = bool)
 
-scaler_o = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_O', 'rb'))
-scaler_h = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_H', 'rb'))
+scaler_o = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_O_descr', 'rb'))
+scaler_h = pickle.load(open('/gpfs/home/smdick/exchange_ml/models/final/scaler_H_descr', 'rb'))
 
 def find_h2o(atoms):
     atomic_numbers = atoms.get_atomic_numbers()
@@ -162,7 +162,7 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
     all_angles = []
     for i, [c, rho, al] in enumerate(zip(coords,rho_list, ['o','h1','h2'])):
         siesta.rho = rho
-        descr = xcml.atom_decomposition(coords, siesta, basis, al)*(37.7945/216)**3
+        descr = xcml.atom_decomposition(coords, siesta, basis, al)
         with open('descritorshape.dat','a') as file:
             file.write('{}\n'.format(len(descr)))
 
@@ -173,27 +173,25 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
 
         if 'o' in al:
             p = p[:,mask_o]
+            p_blocks = [1,10]
+            d_blocks = [4,13]
         else:
             p = p[:,mask_h]
-
+            p_blocks = [1,5]
+            d_blocks = []
 
         p, angles = xcml.align(p, c, np.delete(coords, i, axis = 0)) #TODO coords should be ALL water 
         p = p.flatten()                                                    #coords
         
-        if i == 0:
-            descr = descr[[0,9]]
-        elif i == 1:
-            descr = descr[[0,4]]
-        elif i == 2:
-            descr = descr[[0,4]]
+        descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
 
-        p = np.concatenate([p,descr])
-        if i == 0:
-            p = scaler_o.transform(p.reshape(1,-1)).flatten()
+        if 'o' in al:
+            descr = scaler_o.transform(descr.reshape(1,-1)).flatten()
         else:
-            p = scaler_h.transform(p.reshape(1,-1)).flatten()
+            descr = scaler_h.transform(descr.reshape(1,-1)).flatten()
 
-        all_descr.append(p)
+
+        all_descr.append(descr)
         all_angles.append(angles)
 
     return [np.concatenate(all_descr), np.concatenate(all_angles)]
@@ -202,7 +200,7 @@ class AtomicGetter(FeatureGetter):
 
     def __init__(self, client = None):
         # client = parallel.Client(profile='default')
-        super().__init__(1, n_o_orb = 50, n_h_orb= 26, client = client)
+        super().__init__(1, n_o_orb = 18, n_h_orb= 8, client = client)
         self.basis = {'r_c_o': 1.0,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_c_h' : 1.5,
                       'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
                       'n_l_h' : 2, 'gamma_o': 20, 'gamma_h': 15}

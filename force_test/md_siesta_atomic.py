@@ -125,8 +125,8 @@ if __name__ == '__main__':
 
         if not use_fd:
             try:
-                krr_o = keras.models.load_model(config.model_basepath + 'atom_force_O')
-                krr_h = keras.models.load_model(config.model_basepath + 'atom_force_H')
+                krr_o = keras.models.load_model(config.model_basepath + 'atom_force_O_descr')
+                krr_h = keras.models.load_model(config.model_basepath + 'atom_force_H_descr')
                 h2o.calc.set_force_model(krr_o, krr_h)
                 f_model_found = True
             except KeyError:
