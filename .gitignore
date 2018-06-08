@@ -12,3 +12,4 @@ H2O*
 *.pdf
 *.eps
 force_test/
+md_siesta.traj

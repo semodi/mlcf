@@ -1,4 +1,4 @@
-from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular, single_tread_descriptors_atomic
+from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular, single_thread_descriptors_atomic
 from siestah2o import SiestaH2OAtomic  as SiestaH2O
 import numpy as np
 from ase import Atoms
