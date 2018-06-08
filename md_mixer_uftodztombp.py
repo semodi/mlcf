@@ -1,4 +1,4 @@
-from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular
+from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular, single_tread_descriptors_atomic
 from siestah2o import SiestaH2OAtomic  as SiestaH2O
 import numpy as np
 from ase import Atoms
@@ -140,9 +140,25 @@ if __name__ == '__main__':
     h2o.calc.set_force_model(krr_o, krr_h)
     f_model_found = True
 
-    h2o = reconnect_monomers(h2o)
-    h2o = reconnect_monomers(h2o)
-    calc_slow = MbpolCalculator(h2o)
+    calc_slow = SiestaH2O(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
+    calc_slow.set_solution_method(args.solutionmethod)
+    if n_clients > 1:
+        descr_getter_slow = DescriptorGetter(client)
+    else:
+        descr_getter_slow = DescriptorGetter()
+    #scalers
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/dz_mbp/'
+    scaler_o_slow = pickle.load(open(model_path + 'scaler_O','rb'))
+    scaler_h_slow = pickle.load(open(model_path + 'scaler_H','rb'))
+    descr_getter_slow.set_scalers(scaler_o, scaler_h)
+    descr_getter_slow.single_thread = single_thread_descriptors_atomic
+    calc_slow.set_feature_getter(descr_getter)
+
+    krr_o_slow = keras.models.load_model(model_path + 'force_O')
+    krr_h_slow = keras.models.load_model(model_path + 'force_H')
+    calc_slow.set_force_model(krr_o_slow, krr_h_slow)
+    f_model_found = True
+
     calc_fast = h2o.calc
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
 

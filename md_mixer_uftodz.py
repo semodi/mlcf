@@ -128,7 +128,7 @@ if __name__ == '__main__':
     else:
         descr_getter = DescriptorGetter()
     #scalers
-    model_path = '/gpfs/home/smdick/exchange_ml/models/new/uf_mbp/'
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/uf_dz/'
     scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
     scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
     descr_getter.set_scalers(scaler_o, scaler_h)
@@ -140,9 +140,7 @@ if __name__ == '__main__':
     h2o.calc.set_force_model(krr_o, krr_h)
     f_model_found = True
 
-    h2o = reconnect_monomers(h2o)
-    h2o = reconnect_monomers(h2o)
-    calc_slow = MbpolCalculator(h2o)
+    calc_slow = SiestaH2O(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
     calc_fast = h2o.calc
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
 
