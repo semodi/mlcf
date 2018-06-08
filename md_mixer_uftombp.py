@@ -1,4 +1,5 @@
-from siestah2o import SiestaH2O, write_atoms, read_atoms, Timer, DescriptorGetter
+from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular
+from siestah2o import SiestaH2OAtomic  as SiestaH2O
 import numpy as np
 from ase import Atoms
 from ase.md.npt import NPT
@@ -17,6 +18,7 @@ import config
 import pickle
 from siestah2o import MullikenGetter, Mixer
 from mbpol_calculator import *
+import keras
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -91,19 +93,20 @@ if __name__ == '__main__':
 
 
     # Load initial configuration
-
-    a = 15.646
-
-    h2o = Atoms('128OHH',
-                positions = read('128.xyz').get_positions(),
-                cell = [a, a, a],
-                pbc = True)
-
-    if restart:
-        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
-        h2o.set_positions(last_traj.get_positions())
-        h2o.set_momenta(last_traj.get_momenta())
-
+#
+#    a = 15.646
+#
+#    h2o = Atoms('128OHH',
+#                positions = read('128.xyz').get_positions(),
+#                cell = [a, a, a],
+#                pbc = True)
+#
+#    if restart:
+#        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
+#        h2o.set_positions(last_traj.get_positions())
+#        h2o.set_momenta(last_traj.get_momenta())
+#
+    h2o = read('start.traj')
     try:
         shutil.os.mkdir(args.dir)
     except FileExistsError:
@@ -118,54 +121,24 @@ if __name__ == '__main__':
 
     os.chdir('siesta/')
 
-    h2o.calc = SiestaH2O(basis = args.basis, xc = args.xc, log_accuracy = True)
+    h2o.calc = SiestaH2O(basis = 'uf', xc = args.xc, log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
-    if corrected:
-        e_model_found = False
-        f_model_found = False
-        fd_model_found = False
+    if n_clients > 1:
+        descr_getter = DescriptorGetter(client)
+    else:
+        descr_getter = DescriptorGetter()
+    #scalers
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/uf_mbp/'
+    scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
+    scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
+    descr_getter.set_scalers(scaler_o, scaler_h)
+    descr_getter.single_thread = single_thread_descriptors_molecular    
+    h2o.calc.set_feature_getter(descr_getter)
 
-        if args.features == 'descr':
-            if n_clients > 1:
-                descr_getter = DescriptorGetter(client)
-            else:
-                descr_getter = DescriptorGetter()
-            h2o.calc.set_feature_getter(descr_getter)
-            h2o.calc.set_symmetry(config.par['descr']['sym'])
-
-        elif args.features == 'mull':
-            mull_getter = MullikenGetter(128)
-            try:
-                mull_getter.n_o_orb = config.par['mull']['n_o_orb'][args.basis.lower()]
-                mull_getter.n_h_orb = config.par['mull']['n_h_orb'][args.basis.lower()]
-            except KeyError:
-                print('Error: No Mulliken model available for this basis set')
-            h2o.calc.set_feature_getter(mull_getter)
-
-        try:
-            h2o.calc.set_nn_path(config.model_basepath + config.par[args.features]['nn'][args.basis.lower()])
-            e_model_found = True
-        except KeyError:
-            print('No energy model found, proceeding ...')
-
-        if not use_fd:
-            try:
-                krr_o = pickle.load(open(config.model_basepath + 'krr_Oxygen_descr_uftombp','rb'))
-                krr_h = pickle.load(open(config.model_basepath + 'krr_Hydrogen_descr_uftombp','rb'))
-                h2o.calc.set_force_model(krr_o, krr_h)
-                f_model_found = True
-            except KeyError:
-                raise Exception('Error: no force model found. Aborting...')
-        elif e_model_found:
-            try:
-                krr_o_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_o_dx'][args.basis.lower()], 'rb'))
-                krr_h_dx = pickle.load(open(config.model_basepath + config.par[args.features]['krr_h_dx'][args.basis.lower()], 'rb'))
-                h2o.calc.set_fd_model(krr_o_dx, krr_h_dx)
-                fd_model_found = True
-            except KeyError:
-                raise Exception('Error: no finite difference model found. Aborting...')
-        else:
-            raise Exception('Error: finite difference model cannot be used as energy model not loaded')
+    krr_o = keras.models.load_model(model_path + 'force_O')
+    krr_h = keras.models.load_model(model_path + 'force_H')
+    h2o.calc.set_force_model(krr_o, krr_h)
+    f_model_found = True
 
     h2o = reconnect_monomers(h2o)
     h2o = reconnect_monomers(h2o)
@@ -192,18 +165,9 @@ if __name__ == '__main__':
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 
-#    if restart: # Add hoc solution to determine at which step simulation was stopped
-#        times = np.genfromtxt('Timer')  
-#        mean_time = np.mean(times) 
-#        for mix_i in np.arange(args.mix_n) + 1:
-#            if times[-mix_i] > mean_time + 10:
-#                h2o.calc.step = mix_i    
-
     time_step = Timer('Timer')
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
         h2o.calc.increment_step()
-#        h2o = reconnect_monomers(h2o)
-#       h2o = reconnect_monomers(h2o)
         time_step.stop()
