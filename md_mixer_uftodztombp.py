@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     os.chdir('siesta/')
 
-    h2o.calc = SiestaH2O(basis = 'uf', xc = args.xc, log_accuracy = True)
+    h2o.calc = SiestaH2O(basis = 'uf', xc = 'PBE', log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
     if n_clients > 1:
         descr_getter = DescriptorGetter(client)
@@ -138,7 +138,6 @@ if __name__ == '__main__':
     krr_o = keras.models.load_model(model_path + 'force_O')
     krr_h = keras.models.load_model(model_path + 'force_H')
     h2o.calc.set_force_model(krr_o, krr_h)
-    f_model_found = True
 
     calc_slow = SiestaH2O(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
     calc_slow.set_solution_method(args.solutionmethod)
@@ -150,14 +149,13 @@ if __name__ == '__main__':
     model_path = '/gpfs/home/smdick/exchange_ml/models/new/dz_mbp/'
     scaler_o_slow = pickle.load(open(model_path + 'scaler_O','rb'))
     scaler_h_slow = pickle.load(open(model_path + 'scaler_H','rb'))
-    descr_getter_slow.set_scalers(scaler_o, scaler_h)
+    descr_getter_slow.set_scalers(scaler_o_slow, scaler_h_slow)
     descr_getter_slow.single_thread = single_thread_descriptors_atomic
-    calc_slow.set_feature_getter(descr_getter)
+    calc_slow.set_feature_getter(descr_getter_slow)
 
     krr_o_slow = keras.models.load_model(model_path + 'force_O')
     krr_h_slow = keras.models.load_model(model_path + 'force_H')
     calc_slow.set_force_model(krr_o_slow, krr_h_slow)
-    f_model_found = True
 
     calc_fast = h2o.calc
     mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
