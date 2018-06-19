@@ -117,15 +117,15 @@ class SiestaH2OAtomic(Siesta):
 
             super().__init__(label='H2O',
                xc=xc,
-               mesh_cutoff=200 * Ry,
+               mesh_cutoff=300 * Ry,
                basis_set = 'DZP',
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-            dmtol = 1e-4
-            fdf_arguments['PAO.SplitNorm'] = 0.15
-            fdf_arguments['PAO.SoftDefault'] =  'True'
-            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
-            fdf_arguments['PAO.SoftPotential'] = 1
+            dmtol = 5e-5
+#            fdf_arguments['PAO.SplitNorm'] = 0.15
+#            fdf_arguments['PAO.SoftDefault'] =  'True'
+#            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
+#            fdf_arguments['PAO.SoftPotential'] = 1
 
         fdf_arguments['DM.UseSaveDM'] = 'True'
         fdf_arguments['DM.Tolerance'] = dmtol
