@@ -165,6 +165,16 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
 
         p = xcml.descr_to_P(descr, basis['n_rad_' + al[0]], basis['n_l_' + al[0]])
 
+        coords_folded = fold_back_coords(coords, siesta).reshape(3,3)
+        coords_local = np.array(coords_folded)
+        for u, co in enumerate(coords_folded):         
+            coords_local[u,:] = xcml.in_local_cs(co.reshape(1,-1), coords_folded)
+
+
+        other_coords = np.delete(coords_local, i , axis = 0)
+        c = coords_local[i] 
+
+
         if 'o' in al:
             p = p[:,mask_o]
             p_blocks = [1,10]
@@ -174,9 +184,7 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
             p_blocks = [1,5]
             d_blocks = []
 
-        p, angles = xcml.align(p, c, np.delete(coords, i, axis = 0)) #TODO coords should be ALL water 
-        p = p.flatten()                                                    #coords
-        
+        p, angles = xcml.align(p, c, other_coords) #TODO coords should be ALL water 
         descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
 
         all_descr.append(descr)

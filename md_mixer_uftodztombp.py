@@ -147,14 +147,14 @@ if __name__ == '__main__':
         descr_getter_slow = DescriptorGetter()
     #scalers
     model_path = '/gpfs/home/smdick/exchange_ml/models/new/dz_mbp/'
-    scaler_o_slow = pickle.load(open(model_path + 'scaler_O','rb'))
-    scaler_h_slow = pickle.load(open(model_path + 'scaler_H','rb'))
+    scaler_o_slow = pickle.load(open(model_path + 'scaler_O_pbc','rb'))
+    scaler_h_slow = pickle.load(open(model_path + 'scaler_H_pbc','rb'))
     descr_getter_slow.set_scalers(scaler_o_slow, scaler_h_slow)
     descr_getter_slow.single_thread = single_thread_descriptors_atomic
     calc_slow.set_feature_getter(descr_getter_slow)
 
-    krr_o_slow = keras.models.load_model(model_path + 'force_O')
-    krr_h_slow = keras.models.load_model(model_path + 'force_H')
+    krr_o_slow = keras.models.load_model(model_path + 'force_O_pbc')
+    krr_h_slow = keras.models.load_model(model_path + 'force_H_pbc')
     calc_slow.set_force_model(krr_o_slow, krr_h_slow)
 
     calc_fast = h2o.calc
