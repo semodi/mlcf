@@ -251,7 +251,7 @@ class SiestaH2OAtomic(Siesta):
                         coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), angles=angles).reshape(-1,3)
                 else:
                     correction_force = np.zeros_like(forces)
-                correction_force -= np.mean(correction_force, axis = 0)
+            #    correction_force -= np.mean(correction_force, axis = 0)
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
