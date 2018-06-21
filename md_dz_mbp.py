@@ -129,14 +129,14 @@ if __name__ == '__main__':
         descr_getter = DescriptorGetter()
     #scalers
     model_path = '/gpfs/home/smdick/exchange_ml/models/new/dz_mbp/'
-    scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
-    scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
+    scaler_o = pickle.load(open(model_path + 'scaler_O_pbc','rb'))
+    scaler_h = pickle.load(open(model_path + 'scaler_H_pbc','rb'))
     descr_getter.set_scalers(scaler_o, scaler_h)
     descr_getter.single_thread = single_thread_descriptors_atomic
     h2o.calc.set_feature_getter(descr_getter)
 
-    krr_o = keras.models.load_model(model_path + 'force_O')
-    krr_h = keras.models.load_model(model_path + 'force_H')
+    krr_o = keras.models.load_model(model_path + 'force_O_pbc')
+    krr_h = keras.models.load_model(model_path + 'force_H_pbc')
     h2o.calc.set_force_model(krr_o, krr_h)
     f_model_found = True
 
