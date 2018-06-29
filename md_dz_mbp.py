@@ -95,12 +95,12 @@ if __name__ == '__main__':
 
     a = 15.646
 
-    h2o = Atoms('128OHH',
-                positions = read('128.xyz').get_positions(),
-                cell = [a, a, a],
-                pbc = True)
+#    h2o = Atoms('128OHH',
+#                positions = read('128.xyz').get_positions(),
+#                cell = [a, a, a],
+#                pbc = True)
 
-#    h2o = read('start.traj')
+    h2o = read('32.traj')
 
     if restart:
         last_traj = read(args.dir + 'md_siesta.traj', index = -1)
