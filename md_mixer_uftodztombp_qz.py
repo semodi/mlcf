@@ -145,9 +145,8 @@ if __name__ == '__main__':
         descr_getter_slow = DescriptorGetter(client)
     else:
         descr_getter_slow = DescriptorGetter()
-
     #scalers
-    model_path = '/gpfs/home/smdick/exchange_ml/models/liquid/dz_mbp/'
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/qz_mbp/'
     scaler_o_slow = pickle.load(open(model_path + 'scaler_O','rb'))
     scaler_h_slow = pickle.load(open(model_path + 'scaler_H','rb'))
     descr_getter_slow.set_scalers(scaler_o_slow, scaler_h_slow)

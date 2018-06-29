@@ -100,7 +100,7 @@ if __name__ == '__main__':
                 cell = [a, a, a],
                 pbc = True)
 
-    h2o = read('start.traj')
+#    h2o = read('start.traj')
 
     if restart:
         last_traj = read(args.dir + 'md_siesta.traj', index = -1)

@@ -117,11 +117,11 @@ class SiestaH2OAtomic(Siesta):
 
             super().__init__(label='H2O',
                xc=xc,
-               mesh_cutoff=300 * Ry,
+               mesh_cutoff=200 * Ry,
                basis_set = 'DZP',
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-            dmtol = 5e-5
+            dmtol = 1e-4
 #            fdf_arguments['PAO.SplitNorm'] = 0.15
 #            fdf_arguments['PAO.SoftDefault'] =  'True'
 #            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
@@ -251,7 +251,7 @@ class SiestaH2OAtomic(Siesta):
                         coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), angles=angles).reshape(-1,3)
                 else:
                     correction_force = np.zeros_like(forces)
-            #    correction_force -= np.mean(correction_force, axis = 0)
+                correction_force -= np.mean(correction_force, axis = 0)
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
