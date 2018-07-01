@@ -99,10 +99,8 @@ if __name__ == '__main__':
                 pbc = True)
 
     if restart:
-        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
-        h2o.set_positions(last_traj.get_positions())
-        h2o.set_momenta(last_traj.get_momenta())
-
+        h2o = read(args.dir + 'md_siesta.traj', index = -1)
+    
     try:
         shutil.os.mkdir(args.dir)
     except FileExistsError:
