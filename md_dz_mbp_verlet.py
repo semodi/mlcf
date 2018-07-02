@@ -150,9 +150,7 @@ if __name__ == '__main__':
     traj = io.Trajectory('../md_siesta.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
 
-    dyn = NPT(h2o, timestep = args.dt * ase_units.fs,
-              temperature =  temperature, externalstress = 0,
-              ttime = args.ttime * ase_units.fs, pfactor = None,
+    dyn = VelocityVerlet(h2o, dt = args.dt * ase_units.fs,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 
