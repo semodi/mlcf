@@ -1,6 +1,7 @@
-from siestah2o import SiestaH2OAtomic, write_atoms, read_atoms, Timer, DescriptorGetter, AtomicGetter
-import keras
+from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter
+from siestah2o import single_thread_descriptors_atomic
 import numpy as np
+from siestah2o import SiestaH2OAtomic as SiestaH2O
 from ase import Atoms
 from ase.md.npt import NPT
 from ase.md import VelocityVerlet
@@ -14,9 +15,10 @@ import shutil
 import os
 import ipyparallel as ipp
 import time
-import config
+#import config
 import pickle
 from siestah2o import MullikenGetter
+import keras
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -91,9 +93,19 @@ if __name__ == '__main__':
 
     # Load initial configuration
 
+    a = 15.646
 
-    h2o = read('start.traj')
-#    h2o = read('mono.traj')
+    h2o = Atoms('128OHH',
+                positions = read('128.xyz').get_positions(),
+                cell = [a, a, a],
+                pbc = True)
+
+#    h2o = read('start.traj')
+
+    if restart:
+        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
+        h2o.set_positions(last_traj.get_positions())
+        h2o.set_momenta(last_traj.get_momenta())
 
     try:
         shutil.os.mkdir(args.dir)
@@ -108,31 +120,25 @@ if __name__ == '__main__':
         pass
 
     os.chdir('siesta/')
-
-    h2o.calc = SiestaH2OAtomic(basis = args.basis, xc = args.xc, log_accuracy = True)
+    
+    h2o.calc = SiestaH2O(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
-    if corrected:
-        e_model_found = False
-        f_model_found = False
-        fd_model_found = False
+    if n_clients > 1:
+        descr_getter = DescriptorGetter(client)
+    else:
+        descr_getter = DescriptorGetter()
+    #scalers
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/dz_mbp/'
+    scaler_o = pickle.load(open(model_path + 'scaler_O_pbc','rb'))
+    scaler_h = pickle.load(open(model_path + 'scaler_H_pbc','rb'))
+    descr_getter.set_scalers(scaler_o, scaler_h)
+    descr_getter.single_thread = single_thread_descriptors_atomic
+    h2o.calc.set_feature_getter(descr_getter)
 
-        if args.features == 'descr':
-            if n_clients > 1:
-                descr_getter = AtomicGetter(client)
-            else:
-                descr_getter = AtomicGetter()
-            h2o.calc.set_feature_getter(descr_getter)
-
-        if not use_fd:
-            try:
-                krr_o = keras.models.load_model(config.model_basepath + 'atom_force_O_descr')
-                krr_h = keras.models.load_model(config.model_basepath + 'atom_force_H_descr')
-                h2o.calc.set_force_model(krr_o, krr_h)
-                f_model_found = True
-            except KeyError:
-                raise Exception('Error: no force model found. Aborting...')
-        else:
-            raise Exception('Error: finite difference model cannot be used as energy model not loaded')
+    krr_o = keras.models.load_model(model_path + 'force_O_pbc')
+    krr_h = keras.models.load_model(model_path + 'force_H_pbc')
+    h2o.calc.set_force_model(krr_o, krr_h)
+    f_model_found = True
 
     temperature = args.T * ase_units.kB
 
@@ -146,7 +152,9 @@ if __name__ == '__main__':
     traj = io.Trajectory('../md_siesta.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
 
-    dyn = VelocityVerlet(h2o, dt = args.dt * ase_units.fs,
+    dyn = NPT(h2o, timestep = args.dt * ase_units.fs,
+              temperature =  temperature, externalstress = 0,
+              ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 

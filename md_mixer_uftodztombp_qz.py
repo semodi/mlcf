@@ -1,5 +1,5 @@
-from siestah2o import SiestaH2OAtomic, write_atoms, read_atoms, Timer, DescriptorGetter, AtomicGetter
-import keras
+from siestah2o import write_atoms, read_atoms, Timer, DescriptorGetter, single_thread_descriptors_molecular, single_thread_descriptors_atomic
+from siestah2o import SiestaH2OAtomic  as SiestaH2O
 import numpy as np
 from ase import Atoms
 from ase.md.npt import NPT
@@ -14,9 +14,11 @@ import shutil
 import os
 import ipyparallel as ipp
 import time
-import config
+#import config
 import pickle
-from siestah2o import MullikenGetter
+from siestah2o import MullikenGetter, Mixer
+from mbpol_calculator import *
+import keras
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -62,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('-restart', metavar='restart', type=str, nargs= '?', default='n', help='Restart recent calculation')
     parser.add_argument('-features', metavar='features', type=str, nargs='?', default='descr', help='descr/mull')
     parser.add_argument('-solutionmethod', metavar='solutionmethod', type=str, nargs='?', default='diagon', help='diagon/OMM')
+    parser.add_argument('-mix_n', metavar='mix_n', type=int, nargs='?', default='5', help='Mixing steps')
 
     args = parser.parse_args()
     args.xc = args.xc.upper()
@@ -91,10 +94,19 @@ if __name__ == '__main__':
 
     # Load initial configuration
 
+    a = 15.646
 
-    h2o = read('start.traj')
-#    h2o = read('mono.traj')
+    h2o = Atoms('128OHH',
+                positions = read('128.xyz').get_positions(),
+                cell = [a, a, a],
+                pbc = True)
 
+    if restart:
+        last_traj = read(args.dir + 'md_siesta.traj', index = -1)
+        h2o.set_positions(last_traj.get_positions())
+        h2o.set_momenta(last_traj.get_momenta())
+
+#    h2o = read('start.traj')
     try:
         shutil.os.mkdir(args.dir)
     except FileExistsError:
@@ -109,31 +121,46 @@ if __name__ == '__main__':
 
     os.chdir('siesta/')
 
-    h2o.calc = SiestaH2OAtomic(basis = args.basis, xc = args.xc, log_accuracy = True)
+    h2o.calc = SiestaH2O(basis = 'uf', xc = 'PBE', log_accuracy = True)
     h2o.calc.set_solution_method(args.solutionmethod)
-    if corrected:
-        e_model_found = False
-        f_model_found = False
-        fd_model_found = False
+    if n_clients > 1:
+        descr_getter = DescriptorGetter(client)
+    else:
+        descr_getter = DescriptorGetter()
+    #scalers
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/uf_mbp/'
+    scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
+    scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
+    descr_getter.set_scalers(scaler_o, scaler_h)
+    descr_getter.single_thread = single_thread_descriptors_molecular    
+    h2o.calc.set_feature_getter(descr_getter)
 
-        if args.features == 'descr':
-            if n_clients > 1:
-                descr_getter = AtomicGetter(client)
-            else:
-                descr_getter = AtomicGetter()
-            h2o.calc.set_feature_getter(descr_getter)
+    krr_o = keras.models.load_model(model_path + 'force_O')
+    krr_h = keras.models.load_model(model_path + 'force_H')
+    h2o.calc.set_force_model(krr_o, krr_h)
 
-        if not use_fd:
-            try:
-                krr_o = keras.models.load_model(config.model_basepath + 'atom_force_O_descr')
-                krr_h = keras.models.load_model(config.model_basepath + 'atom_force_H_descr')
-                h2o.calc.set_force_model(krr_o, krr_h)
-                f_model_found = True
-            except KeyError:
-                raise Exception('Error: no force model found. Aborting...')
-        else:
-            raise Exception('Error: finite difference model cannot be used as energy model not loaded')
+    calc_slow = SiestaH2O(basis = 'dz_custom', xc = 'BH', log_accuracy = True)
+    calc_slow.set_solution_method(args.solutionmethod)
+    if n_clients > 1:
+        descr_getter_slow = DescriptorGetter(client)
+    else:
+        descr_getter_slow = DescriptorGetter()
+    #scalers
+    model_path = '/gpfs/home/smdick/exchange_ml/models/new/qz_mbp/'
+    scaler_o_slow = pickle.load(open(model_path + 'scaler_O','rb'))
+    scaler_h_slow = pickle.load(open(model_path + 'scaler_H','rb'))
+    descr_getter_slow.set_scalers(scaler_o_slow, scaler_h_slow)
+    descr_getter_slow.single_thread = single_thread_descriptors_atomic
+    calc_slow.set_feature_getter(descr_getter_slow)
 
+    krr_o_slow = keras.models.load_model(model_path + 'force_O')
+    krr_h_slow = keras.models.load_model(model_path + 'force_H')
+    calc_slow.set_force_model(krr_o_slow, krr_h_slow)
+
+    calc_fast = h2o.calc
+    mixer_calculator = Mixer(calc_fast, calc_slow, args.mix_n)
+
+    h2o.calc = mixer_calculator
     temperature = args.T * ase_units.kB
 
     # Setting the initial T 100 K lower leads to faster convergence of initial oscillations
@@ -141,12 +168,14 @@ if __name__ == '__main__':
         MaxwellBoltzmannDistribution(h2o, args.T * ase_units.kB)
         print('ttime= {} fs :: temperature = {}'.format(ttime,h2o.get_temperature()))
 
-    h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
+        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
 
     traj = io.Trajectory('../md_siesta.traj'.format(int(ttime)),
                          mode = 'a', atoms = h2o)
 
-    dyn = VelocityVerlet(h2o, dt = args.dt * ase_units.fs,
+    dyn = NPT(h2o, timestep = args.dt * ase_units.fs,
+              temperature =  temperature, externalstress = 0,
+              ttime = args.ttime * ase_units.fs, pfactor = None,
                          trajectory=traj,
                          logfile='../md_siesta.log'.format(int(ttime)))
 
@@ -154,5 +183,5 @@ if __name__ == '__main__':
     for i in range(args.Nt):
         time_step.start_timer()
         dyn.run(1)
-#        h2o.set_momenta(h2o.get_momenta() - np.mean(h2o.get_momenta(),axis =0))
+        h2o.calc.increment_step()
         time_step.stop()

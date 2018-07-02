@@ -44,13 +44,16 @@ def get_binned(indices, traj_path, bins, a = 0):
     
     for i in indices:
         traj = read(traj_path, index = i)
+        n_mol = int(len(traj.get_positions())/3)
         if a > 0:
             traj.cell = [a,a,a]
             traj.pbc = True
+        else:
+            a = traj.get_cell()[0,0]
         print(traj)
-        r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,::3][np.triu_indices(128,1)], bins)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,::3][np.triu_indices(n_mol,1)], bins)
     
-    g_avg = .5*128*(127)/(15.646**3)
+    g_avg = .5*n_mol*(n_mol-1)/(a**3)
     n_obs = len(indices)
     norm = bins[:-1]**2 * g_avg * n_obs * 4 * np.pi * dr
     
@@ -79,14 +82,17 @@ def get_binned_oh(indices, traj_path, bins, a = 0):
     
     for i in indices:
         traj = read(traj_path, index = i)
+        n_mol = int(len(traj.get_positions())/3)
         if a > 0:
             traj.cell = [a,a,a]
             traj.pbc = True
+        else:
+            a = traj.get_cell()[0,0]
         print(traj)
         r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,1::3], bins)
         r_oo += binned_distance(traj.get_all_distances(mic = True)[::3,2::3], bins)
         
-    g_avg = .5*128*(127)/(15.646**3)
+    g_avg = .5*n_mol*(n_mol-1)/(a**3)
     n_obs = len(indices)
     norm = bins[:-1]**2 * g_avg * n_obs * 4 * np.pi * dr
     
@@ -115,13 +121,18 @@ def get_binned_hh(indices, traj_path, bins, a = 0):
     
     for i in indices:
         traj = read(traj_path, index = i)
+        n_mol = int(len(traj.get_positions())/3)
         if a > 0:
             traj.cell = [a,a,a]
             traj.pbc = True
+        else:
+            a = traj.get_cell()[0,0]
         print(traj)
         r_oo += binned_distance(traj.get_all_distances(mic = True)[1::3,2::3], bins)
-    
-    g_avg = .5*128*(127)/(15.646**3)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[1::3,1::3][np.triu_indices(n_mol,1)], bins)
+        r_oo += binned_distance(traj.get_all_distances(mic = True)[2::3,2::3][np.triu_indices(n_mol,1)], bins)
+        
+    g_avg = .5*n_mol*(n_mol-1)/(a**3)*3
     n_obs = len(indices)
     norm = bins[:-1]**2 * g_avg * n_obs * 4 * np.pi * dr
     

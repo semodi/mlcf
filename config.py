@@ -22,8 +22,8 @@ par['descr']['krr_o'] = {'dz_custom': 'krr_Oxygen_descr',
                          'dzp': 'krr_Oxygen_descr',
                          'uf' : 'krr_Oxygen_descr_uftodzp'}
 
-par['atomic']['krr_o'] = {'dz_custom': 'atom_force_O'}
-par['atomic']['krr_h'] = {'dz_custom': 'atom_force_H'}
+par['atomic']['krr_o'] = {'dz_custom': 'atom_force_O_descr'}
+par['atomic']['krr_h'] = {'dz_custom': 'atom_force_H_descr'}
 
 par['descr']['krr_h'] = {}
 for key in par['descr']['krr_o']:

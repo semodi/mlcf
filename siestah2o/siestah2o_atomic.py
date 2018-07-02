@@ -122,10 +122,10 @@ class SiestaH2OAtomic(Siesta):
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
             dmtol = 1e-4
-            fdf_arguments['PAO.SplitNorm'] = 0.15
-            fdf_arguments['PAO.SoftDefault'] =  'True'
-            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
-            fdf_arguments['PAO.SoftPotential'] = 1
+#            fdf_arguments['PAO.SplitNorm'] = 0.15
+#            fdf_arguments['PAO.SoftDefault'] =  'True'
+#            fdf_arguments['PAO.SoftInnerRadius'] =  0.9
+#            fdf_arguments['PAO.SoftPotential'] = 1
 
         fdf_arguments['DM.UseSaveDM'] = 'True'
         fdf_arguments['DM.Tolerance'] = dmtol
@@ -219,11 +219,19 @@ class SiestaH2OAtomic(Siesta):
                 features, n_o_orb, n_h_orb, h2o_indices, angles =\
                     self.feature_getter.get_features(atoms)
                 n_orb = n_o_orb + 2*n_h_orb
+                features_denorm = np.array(features).reshape(-1,n_orb) 
+                features_denorm[:,:n_o_orb] =\
+                 self.feature_getter.scaler_o.inverse_transform(features_denorm[:,:n_o_orb])
+                features_denorm[:,n_o_orb:n_o_orb + n_h_orb] =\
+                  self.feature_getter.scaler_h.inverse_transform(features_denorm[:,n_o_orb:n_o_orb+n_h_orb])
+                features_denorm[:,n_o_orb+n_h_orb:] =\
+                  self.feature_getter.scaler_h.inverse_transform(features_denorm[:,n_o_orb+n_h_orb:])
+                features_denorm = features_denorm.reshape(features.shape)
                 time_ML = Timer("TIME_ML")
 
                 if self.corrected_e:
                     self.nn_model = load_network(self.nn_path) # TEMP FIX
-                    correction = use_model_descr(features.reshape(1,-1), n_mol,
+                    correction = use_model_descr(features_denorm.reshape(1,-1), n_mol,
                          nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, sym = self.symmetry)[0]
                 else:
                     correction = 0
