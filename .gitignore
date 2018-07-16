@@ -1,4 +1,5 @@
 workdir/
+input/
 *.png
 h2o.*
 __pycache__/

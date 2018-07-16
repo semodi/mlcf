@@ -1,0 +1,12 @@
+XYZpath   ./32.traj
+T   300
+restart T
+SolutionMethod OMM
+Basis dz_custom
+
+%block mixing
+  model1    pathtomodel1
+  model2    pathtomodel2
+  basis1    uf
+  xcfunctional2    pbe
+%endblock mixing

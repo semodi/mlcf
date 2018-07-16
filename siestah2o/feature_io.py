@@ -10,8 +10,10 @@ import siesta_utils.grid as siesta
 import ipyparallel as parallel
 
 
-mask_o = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/O_mask', delimiter = ',',dtype = bool)
-mask_h = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/final/H_mask', delimiter = ',',dtype = bool)
+#mask_o = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/O_mask', delimiter = ',',dtype = bool)
+#mask_h = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/H_mask', delimiter = ',',dtype = bool)
+mask_o = np.genfromtxt('/home/sebastian/Documents/Code/exchange_ml/models/O_mask', delimiter = ',',dtype = bool)
+mask_h = np.genfromtxt('/home/sebastian/Documents/Code/exchange_ml/models/H_mask', delimiter = ',',dtype = bool)
 
 
 def find_h2o(atoms):
@@ -111,17 +113,17 @@ def single_thread_descriptors_molecular(coords, rho_list, grid, uc, basis):
 
         if al == 'h1':
             descr *= np.array([1,-1,1,-1,1,-1,1,-1])
-       
+
         coords_folded = fold_back_coords(coords, siesta).reshape(3,3)
         dist = np.linalg.norm(coords_folded - coords_folded[0], axis = 1)
         if np.any(dist > 2.5):
             raise Exception('Folding did not work')
         coords_local = np.array(coords_folded)
-        for u, co in enumerate(coords_folded):         
+        for u, co in enumerate(coords_folded):
             coords_local[u,:] = xcml.in_local_cs(co.reshape(1,-1), coords_folded)
 
         other_coords = np.delete(coords_local, i , axis = 0)
-        c = coords_local[i] 
+        c = coords_local[i]
 
         if al =='o':
             order = np.argsort(np.linalg.norm(other_coords - c,axis=1))
@@ -136,8 +138,8 @@ def single_thread_descriptors_molecular(coords, rho_list, grid, uc, basis):
             d_blocks = []
 
 
-        _, angles = xcml.align_molecular(np.zeros([3,3]), c, other_coords) #TODO coords should be ALL water 
-        
+        _, angles = xcml.align_molecular(np.zeros([3,3]), c, other_coords) #TODO coords should be ALL water
+
         descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
 
         all_descr.append(descr)
@@ -167,13 +169,12 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
 
         coords_folded = fold_back_coords(coords, siesta).reshape(3,3)
         coords_local = np.array(coords_folded)
-        for u, co in enumerate(coords_folded):         
+        for u, co in enumerate(coords_folded):
             coords_local[u,:] = xcml.in_local_cs(co.reshape(1,-1), coords_folded)
 
 
         other_coords = np.delete(coords_local, i , axis = 0)
-        c = coords_local[i] 
-
+        c = coords_local[i]
 
         if 'o' in al:
             p = p[:,mask_o]
@@ -184,7 +185,7 @@ def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
             p_blocks = [1,5]
             d_blocks = []
 
-        p, angles = xcml.align(p, c, other_coords) #TODO coords should be ALL water 
+        p, angles = xcml.align(p, c, other_coords) #TODO coords should be ALL water
         descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
 
         all_descr.append(descr)
@@ -230,10 +231,10 @@ class DescriptorGetter(FeatureGetter):
         features = self.view.map_sync(self.single_thread, coords, rho_snippets,
             [siesta.grid]*len(coords),[siesta.unitcell]*len(coords),
             [self.basis]*len(coords))
-        
+
         descr = [f[0] for f in features]
         angles = [f[1] for f in features]
-        
+
         time_getfeat.stop()
         descr = np.array(descr)
         descr[:,:self.n_o_orb] = self.scaler_o.transform(descr[:,:self.n_o_orb])

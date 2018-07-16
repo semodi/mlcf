@@ -21,6 +21,8 @@ import siesta_utils.grid as siesta
 from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
 
+from read_input import settings, mixing_settings
+
 offset_nn = (-469.766523)
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -101,7 +103,7 @@ class SiestaH2OAtomic(Siesta):
                energy_shift=0.02 * Ry,
                basis_set = 'SZ')
             dmtol = 5e-4
-        
+
         elif not 'custom' in basis.lower():
             super().__init__(label='H2O',
                xc=xc,
@@ -219,7 +221,7 @@ class SiestaH2OAtomic(Siesta):
                 features, n_o_orb, n_h_orb, h2o_indices, angles =\
                     self.feature_getter.get_features(atoms)
                 n_orb = n_o_orb + 2*n_h_orb
-                features_denorm = np.array(features).reshape(-1,n_orb) 
+                features_denorm = np.array(features).reshape(-1,n_orb)
                 features_denorm[:,:n_o_orb] =\
                  self.feature_getter.scaler_o.inverse_transform(features_denorm[:,:n_o_orb])
                 features_denorm[:,n_o_orb:n_o_orb + n_h_orb] =\
@@ -238,27 +240,21 @@ class SiestaH2OAtomic(Siesta):
                 siesta.unitcell = np.zeros([3,3])
                 siesta.unitcell[0, 0] = atoms.get_cell()[0, 0]*AtoBohr #TEMP FIX
 
-                if self.use_fd:
-                    if not self.corrected_e:
-                        raise Exception('No energy model provided for finite difference')
-                    correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
-                        self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta),
-                        direction_factor = 1e4, sym = self.symmetry)
-                elif self.corrected_f:
+                if self.corrected_f:
                     correction_force = use_force_model_atomic(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
                         coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), angles=angles).reshape(-1,3)
                 else:
                     correction_force = np.zeros_like(forces)
-                
-                #Subtract mean force
-                mass_O = atoms.get_masses()[h2o_indices][0]
-                mass_H = atoms.get_masses()[h2o_indices][1]
-                mean_correction = np.mean(correction_force, axis = 0)/(mass_O * 2 * mass_H)
-                correction_force[::3] -= mass_O * mean_correction
-                correction_force[1::3] -= mass_H * mean_correction
-                correction_force[2::3] -= mass_H * mean_correction
+
+                if settings['cmcorrection']:
+                    # Subtract mean force
+                    mass_O = atoms.get_masses()[h2o_indices][0]
+                    mass_H = atoms.get_masses()[h2o_indices][1]
+                    mean_correction = np.mean(correction_force, axis = 0)/(mass_O + 2 * mass_H)
+                    correction_force[::3] -= mass_O * mean_correction * 3
+                    correction_force[1::3] -= mass_H * mean_correction * 3
+                    correction_force[2::3] -= mass_H * mean_correction * 3
 
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
@@ -277,25 +273,3 @@ class SiestaH2OAtomic(Siesta):
     def get_forces(self, atoms):
         self.get_potential_energy(atoms)
         return self.forces
-
-
-def write_atoms(atoms, path, save_energy = True):
-    traj = Trajectory(path,'w')
-    traj.write(atoms)
-    if save_energy:
-        with open(path +'.energy', 'w') as efile:
-            efile.write('{}\n'.format(atoms.get_potential_energy()))
-
-def read_atoms(path, basis, xc):
-    h2o = Trajectory(path,'r')[-1]
-    siesta_calc = SiestaH2O(basis, xc)
-
-    try:
-        with open(path + '.energy', 'r') as efile:
-            siesta_calc.Epot = float(efile.readline().strip())
-        siesta_calc.last_positions = h2o.get_positions()
-    except FileNotFoundError:
-        print('Energy file not found. Proceeding...')
-
-    h2o.set_calculator(siesta_calc)
-    return h2o

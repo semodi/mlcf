@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 par = {}
 model_basepath = '/gpfs/home/smdick/exchange_ml/models/final/'
 #model_basepath = '/home/sebastian/Documents/Code/exchange_ml/models/final/'
@@ -38,7 +38,6 @@ par['descr']['krr_h_dx'] = {'dz_custom': 'krr_dx_H_descriptors',
                             'dzp': 'krr_dx_H_descriptors'}
 
 #---- Symmetry factor for force model ------
-par['descr']['sym'] = np.genfromtxt('symmetry.dat')
 
 #================= Mulliken models =======================
 

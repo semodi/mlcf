@@ -100,7 +100,7 @@ class SiestaH2O(Siesta):
                energy_shift=0.02 * Ry,
                basis_set = 'SZ')
             dmtol = 5e-4
-        
+
         elif not 'custom' in basis.lower():
             super().__init__(label='H2O',
                xc=xc,
@@ -226,17 +226,11 @@ class SiestaH2O(Siesta):
                          nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, sym = self.symmetry)[0]
                 else:
                     correction = 0
+
                 siesta.unitcell = np.zeros([3,3])
                 siesta.unitcell[0, 0] = atoms.get_cell()[0, 0]*AtoBohr #TEMP FIX
 
-                if self.use_fd:
-                    if not self.corrected_e:
-                        raise Exception('No energy model provided for finite difference')
-                    correction_force = use_force_model_fd(features.reshape(-1,n_orb),self.krr_o_dx,
-                        self.krr_h_dx, self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs= True,
-                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta),
-                        direction_factor = 1e4, sym = self.symmetry)
-                elif self.corrected_f:
+                if self.corrected_f:
                     correction_force = use_force_model(features.reshape(-1,n_orb),self.krr_o,
                         self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
                         coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), sym = self.symmetry)
@@ -260,25 +254,3 @@ class SiestaH2O(Siesta):
     def get_forces(self, atoms):
         self.get_potential_energy(atoms)
         return self.forces
-
-
-def write_atoms(atoms, path, save_energy = True):
-    traj = Trajectory(path,'w')
-    traj.write(atoms)
-    if save_energy:
-        with open(path +'.energy', 'w') as efile:
-            efile.write('{}\n'.format(atoms.get_potential_energy()))
-
-def read_atoms(path, basis, xc):
-    h2o = Trajectory(path,'r')[-1]
-    siesta_calc = SiestaH2O(basis, xc)
-
-    try:
-        with open(path + '.energy', 'r') as efile:
-            siesta_calc.Epot = float(efile.readline().strip())
-        siesta_calc.last_positions = h2o.get_positions()
-    except FileNotFoundError:
-        print('Energy file not found. Proceeding...')
-
-    h2o.set_calculator(siesta_calc)
-    return h2o
