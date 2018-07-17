@@ -20,7 +20,6 @@ import pickle
 import siesta_utils.grid as siesta
 from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
-
 from read_input import settings, mixing_settings
 
 offset_nn = (-469.766523)
@@ -255,7 +254,7 @@ class SiestaH2OAtomic(Siesta):
                     correction_force[::3] -= mass_O * mean_correction * 3
                     correction_force[1::3] -= mass_H * mean_correction * 3
                     correction_force[2::3] -= mass_H * mean_correction * 3
-
+#
                 time_ML.stop()
                 pot_energy = pot_energy - correction - n_mol * offset_nn
                 forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
