@@ -1,17 +1,17 @@
-import numpy as np 
+import numpy as np
 class Density():
     def __init__(self, rho, unitcell, grid):
         if rho.ndim != 3:
             raise Exception('rho.ndim = {}, expected: 3'.format(rho.ndim))
         if unitcell.shape != (3,3):
             raise Exception('unitcell.shape = {}, expected: (3,3)'.format(unitcell.shape))
-        if grid.shape != (3):
-            raise Exception('grid.shape = {}, expected: (3)'.format(grid.shape))
+        if grid.shape != (3,):
+            raise Exception('grid.shape = {}, expected: (3,)'.format(grid.shape))
         self.rho = rho
         self.unitcell = unitcell
         self.grid = grid
 
-    def mesh_3d(rmin=[0, 0, 0], rmax=0, scaled = False, pbc = True, indexing = 'xy'):
+    def mesh_3d(self, rmin=[0, 0, 0], rmax=0, scaled = False, pbc = True, indexing = 'xy'):
 
         """Returns a 3d mesh taking into account periodic boundary conditions
 
@@ -53,3 +53,12 @@ class Density():
         Rm = np.concatenate([Xm.reshape(*Xm.shape,1),
                              Ym.reshape(*Xm.shape,1),
                              Zm.reshape(*Xm.shape,1)], axis = 3)
+
+        if scaled:
+            R = np.einsum('ij,klmj -> iklm', U.T , Rm)
+            X = R[0,:,:,:]
+            Y = R[1,:,:,:]
+            Z = R[2,:,:,:]
+            return X,Y,Z
+        else:
+            return Xm,Ym,Zm

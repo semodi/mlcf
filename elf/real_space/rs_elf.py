@@ -6,7 +6,7 @@ from sympy import N
 from functools import reduce
 import time
 from ase import Atoms
-from density import Density
+from .density import Density
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -50,7 +50,15 @@ def box_around(pos, radius, density, unit = 'A'):
 
     return {'mesh':[Xm, Ym, Zm],'real': [X,Y,Z],'radial':[R, Theta, Phi]}
 
-def S(r_i, r_o, nmax = 3, gamma):
+def g(r,r_i,  r_c, a, gamma):
+    def g_(r, r_i, r_c, a):
+        return (r-r_i)**(2)*(r_c-r)**(a+2)*np.exp(-gamma*(r/r_c)**(1/4))
+#          return (r-r_i)**(5)*(r_c-r)**(a+2)
+    r_grid = np.arange(r_i, r_c, (r_c-r_i)/1e3)
+    N = np.sqrt(np.sum(g_(r_grid,r_i,r_c, a)*g_(r_grid,r_i,r_c,a))*(r_c-r_i)/1e3)
+    return g_(r,r_i,r_c,a)/N
+
+def S(r_i, r_o, nmax, gamma):
     '''
     Overlap matrix between radial basis functions
     '''
@@ -88,7 +96,7 @@ def get_W(r_i, r_o, n, gamma):
 
 def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
     '''
-    Parameter:
+    Parameters:
     ----------
     rho: np.ndarray; electron charge density on grid
     box: dict; contains the mesh in spherical and euclidean coordinates
@@ -138,7 +146,18 @@ def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
                     coeff['{},{},{}'.format(n,l,m-l)] = np.sum(angs[l][m]*rads[n]*rho[Xm, Ym, Zm])*V_cell
     return coeff
 
-def atomic_ELF(pos, density, basis, chem_symbol):
+def make_real(coeff, n_rad, n_ang):
+
+    coeff_real = []
+        for n in range(n_rad):
+        for l in range(n_ang):
+            for m in range(-l,0):
+                coeff_real.append((-1/np.sqrt(2)*(coeff['{},{},{}'.format(n,l,m)]+(-1)**m*coeff['{},{},{}'.format(n,l,-m)])).real)
+                coeff_real.append((-1j/np.sqrt(2)*(coeff['{},{},{}'.format(n,l,m)]-(-1)**m*coeff['{},{},{}'.format(n,l,-m)])).real)
+            coeff_real.append(coeff['{},{},{}'.format(n,l,0)].real)
+    return coeff_real
+
+def atomic_elf(pos, density, basis, chem_symbol):
     '''
     Given an input density and an atomic position decompose the
     surrounding charge density into an ELF
@@ -158,7 +177,7 @@ def atomic_ELF(pos, density, basis, chem_symbol):
 
     chem_symbol = chem_symbol.lower()
 
-    if pos.shape == (3):
+    if pos.shape == (3,):
         pos = pos.reshape(1,3)
     if pos.shape != (1,3):
         raise Exception('pos has wrong shape')
@@ -185,8 +204,8 @@ def atomic_ELF(pos, density, basis, chem_symbol):
 
     return np.array(coeff_real)
 
-def get_ELF(atoms, density, basis):
-'''
+def get_elf(atoms, density, basis):
+    '''
     Given an input density and an ASE Atoms object decompose the
     complete charge density into atomic ELFs
 
@@ -204,6 +223,6 @@ def get_ELF(atoms, density, basis):
     list; list containing the real atomic ELFs as dictionaries'''
 
     elfs = []
-    for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbol()):
-        elfs.append(atomic_ELF(pos, density, basis, sym))
+    for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
+        elfs.append(atomic_elf(pos, density, basis, sym))
     return elfs
