@@ -146,17 +146,6 @@ def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
                     coeff['{},{},{}'.format(n,l,m-l)] = np.sum(angs[l][m]*rads[n]*rho[Xm, Ym, Zm])*V_cell
     return coeff
 
-def make_real(coeff, n_rad, n_ang):
-
-    coeff_real = []
-    for n in range(n_rad):
-        for l in range(n_ang):
-            for m in range(-l,0):
-                coeff_real.append((-1/np.sqrt(2)*(coeff['{},{},{}'.format(n,l,m)]+(-1)**m*coeff['{},{},{}'.format(n,l,-m)])).real)
-                coeff_real.append((-1j/np.sqrt(2)*(coeff['{},{},{}'.format(n,l,m)]-(-1)**m*coeff['{},{},{}'.format(n,l,-m)])).real)
-            coeff_real.append(coeff['{},{},{}'.format(n,l,0)].real)
-    return coeff_real
-
 def atomic_elf(pos, density, basis, chem_symbol):
     '''
     Given an input density and an atomic position decompose the
@@ -199,10 +188,7 @@ def atomic_elf(pos, density, basis, chem_symbol):
                            basis['gamma_' + chem_symbol],
                            V_cell = V_cell)
 
-    coeff_real = make_real(coeff,
-     basis['n_rad_' + chem_symbol],basis['n_l_' + chem_symbol])
-
-    return np.array(coeff_real)
+    return coeff
 
 def get_elf(atoms, density, basis):
     '''
