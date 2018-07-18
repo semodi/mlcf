@@ -2,7 +2,7 @@ import pytest
 import unittest
 from elf.siesta import get_data
 from elf.real_space import Density, get_elf
-from elf.tensor import get_nncs_angles
+from elf.geom import get_nncs_angles
 from ase.io import read
 import os
 
@@ -14,7 +14,6 @@ def test_nncs():
     atoms = read('./test/dimer.traj')
     for i in range(6):
         angles = get_nncs_angles(i, atoms.get_positions())
-        print(angles)
     
 if __name__ == '__main__':
     test_nncs()

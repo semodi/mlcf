@@ -1,18 +1,27 @@
 import numpy as np
 import spherical_functions as sf
 
+def get_max(tensor):
+    """
+    Get the maximum radial index and maximum ang. momentum in tensor
+    """
+    for n in range(1000):
+        if not '{},0,0'.format(n) in tensor:
+            n_max = n
+    for l in range(1000):
+        if not '0,{},0'.format(l) in tensor:
+            l_max = l
+    return n_max, l_max
+
 def make_real(tensor):
-    '''
+    """
     Take complex tensors tensor provided as a dict and convert them into
     real tensors
-    '''
+    """
     tensor_real = []
-    for n in range(100):
-        if not '{},0,0'.format(n) in tensor:
-            break
-        for l in range(100):
-            if not '{},{},0'.format(n,l) in tensor:
-                break
+    n_max, l_max = get_max(tensor)
+    for n in range(n_max):
+        for l in range(l_max):
             for m in range(-l,0):
                 tensor_real.append((-1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
             tensor_real.append(tensor['{},{},{}'.format(n,l,0)].real)
@@ -22,14 +31,13 @@ def make_real(tensor):
     return tensor_real
 
 def get_casimir(tensor):
-    ''' Get the casimir element (equiv. to L_2 norm) of a tensor
-    '''
+    """ Get the casimir element (equiv. to L_2 norm) of a tensor
+    """
     casimir = {}
 
-    for n in range(100):
-        if not '{},0,0'.format(n) in tensor:
-            break
-        for l in range(100):
+    n_max, l_max = get_max(tensor)
+    for n in range(n_max):
+        for l in range(l_max):
             if not '{},{},0'.format(n,l) in tensor:
                 break
             casimir['{},{}'.format(n,l)] = 0
@@ -86,18 +94,20 @@ def rotate_tensor(tensor, angles, inverse = False):
     if not isinstance(tensor['0,0,0'], np.complex128) and not isinstance(tensor['0,0,0'], np.complex64):
         raise Exception('tensor has to be complex')
     R = {}
-    for l in range(1,100):
+
+    n_max, l_max = get_max(tensor)
+    for l in range(1,l_max):
         if not '0,{},0'.format(l) in tensor:
             break
         R[l] = sf.Wigner_D_element(*angles,np.array([l])).reshape(2*l+1,2*l+1)
 
     tensor_rotated = {}
-    for n in range(100):
+    for n in range(n_max):
         if not '{},0,0'.format(n) in tensor:
             break
 
         tensor_rotated['{},0,0'.format(n)] = tensor['{},0,0'.format(n)]
-        for l in range(1, 100):
+        for l in range(1, l_max):
             if not '0,{},0'.format(l) in tensor:
                 break
             t = []
