@@ -2,6 +2,7 @@
 """
 import numpy as np
 import struct
+from ase.units import Bohr
 
 def get_data_bin(file_path):
     """ Same as get_data for binary (unformatted) files
@@ -27,7 +28,7 @@ def get_data_bin(file_path):
     content = np.array(struct.unpack(block,bin_file.read(struct.calcsize(block))))
 
     rho = content.reshape(a+2, a, a, order = 'F')[1:-1,:,:]
-    return rho, unitcell, grid
+    return rho, unitcell*Bohr, grid
 
 def get_data(file_path):
     """Import data from RHO file (or similar real-space grid files)
@@ -77,4 +78,4 @@ def get_data(file_path):
     # closed shell -> we don't care about spin.
     rho = rho[:, :, :, 0]
     grid = grid[:3]
-    return rho, unitcell, grid
+    return rho, unitcell*Bohr, grid

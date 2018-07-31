@@ -7,6 +7,7 @@ from functools import reduce
 import time
 from ase import Atoms
 from .density import Density
+from ase.units import Bohr
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -26,7 +27,7 @@ def box_around(pos, radius, density, unit = 'A'):
     a = np.linalg.norm(density.unitcell, axis = 1)/density.grid[:3]
     U = U.T
 
-    #Create box with max. distance = radius, assumes
+    #Create box with max. distance = radius
     rmax = np.ceil(radius / a).astype(int).tolist()
     Xm, Ym, Zm = density.mesh_3d(scaled = False, pbc= False, rmax = rmax, indexing = 'ij')
     X, Y, Z = density.mesh_3d(scaled = True, pbc= False, rmax = rmax, indexing = 'ij')
@@ -50,7 +51,10 @@ def box_around(pos, radius, density, unit = 'A'):
 
     return {'mesh':[Xm, Ym, Zm],'real': [X,Y,Z],'radial':[R, Theta, Phi]}
 
-def g(r,r_i,  r_c, a, gamma):
+def g(r, r_i, r_c, a, gamma):
+    """
+    Non-orthogonalized radial spherical_functions
+    """
     def g_(r, r_i, r_c, a):
         return (r-r_i)**(2)*(r_c-r)**(a+2)*np.exp(-gamma*(r/r_c)**(1/4))
 #          return (r-r_i)**(5)*(r_c-r)**(a+2)
@@ -176,8 +180,10 @@ def atomic_elf(pos, density, basis, chem_symbol):
         U[i,:] = U[i,:] / density.grid[i]
     V_cell = np.linalg.det(U)
 
-    V_cell /= (37.7945/216)**3 # !!!!!!!!! Temporary solution !!!!!!!!!!!!!!!!
-
+    # TODO:
+    # The following two lines are needed to obtain the dataset from the old implementation
+    V_cell /= (37.7945/216)**3*Bohr**3
+    V_cell *= np.sqrt(Bohr)
 
     box = box_around(pos, basis['r_o_' + chem_symbol], density)
     coeff = decompose(density.rho, box,
