@@ -133,6 +133,10 @@ def rotate_tensor(tensor, angles, inverse = False):
     Returns:
     ---------
     Rotated version of vec
+
+    Info:
+    -------
+    Remember that in nncs and elfcs alignment, inverse = True should be used
     """
     if not isinstance(tensor['0,0,0'], np.complex128) and not isinstance(tensor['0,0,0'], np.complex64)\
         and not type(tensor['0,0,0']) == complex:
@@ -235,7 +239,6 @@ def get_elfcs_angles(tensor, i, coords):
         for o in order:
             axis2 = coords[o] - c
             if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
-                print(axis1.dot(axis2))
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')
