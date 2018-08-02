@@ -3,6 +3,10 @@ import spherical_functions as sf
 from sympy.physics.wigner import wigner_3j
 from sympy import N
 
+# Transformation matrix between radial and euclidean (real) representation of
+# a rank-1 tensor
+T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
+
 def get_max(tensor):
     """
     Get the maximum radial index and maximum ang. momentum in tensor
@@ -99,6 +103,22 @@ def get_euler_angles(co):
     return alpha, beta, gamma
 
 
+def rotate_vector(vec, angles, inverse = False):
+    """ Rotate a real vector (euclidean order: xyz) with euler angles
+        inverse = False: rotate vector
+        inverse = True: rotate CS"""
+    vec = vec[:,[1,2,0]]
+    T_inv = np.conj(T.T)
+
+    R = T.dot(sf.Wigner_D_element(*angles,np.array([1])).reshape(3,3).dot(T_inv))
+    assert np.allclose(R.conj(), R)
+
+    if inverse:
+        vec = np.einsum('ij,kj -> ki', R.T, vec)
+    else:
+        vec= np.einsum('ij,kj -> ki', R, vec)
+
+    return vec[:,[2,0,1]].real
 
 def rotate_tensor(tensor, angles, inverse = False):
     """ Rotate a (complex!) tensor.
@@ -139,7 +159,7 @@ def rotate_tensor(tensor, angles, inverse = False):
                 t.append(tensor['{},{},{}'.format(n,l,m)])
             t = np.array(t)
             if inverse:
-                t_rotated = R[l].T.dot(t)
+                t_rotated = R[l].T.conj().dot(t)
             else:
                 t_rotated = R[l].dot(t)
             for m in range(-l,l+1):
@@ -170,19 +190,13 @@ def get_P(tensor, wig3j = None):
             for n2 in range(n_rad):
                 for l1 in range(n_l):
                     for l2 in range(n_l):
+                        if (l1 + l2)%2 == 0: continue
                         p = 0
                         for m in range(-n_l, n_l+1):
                             wig = wig3j[l2,l1,mu,(m-mu),-m]
                             if wig != 0:
-                                add = tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
+                                p += tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
                                   (-1)**m * wig
-                                p += add
-#                                if mu == 0 and not np.allclose(add, 0):
-#                                    print('({},{},{},{},{},{}) = {}'.format(lam, l2,l1,mu,(m-mu),-m, wig))
-#                                p += tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
-#                                (-1)**m * wig
-                        if mu == 0 and not np.allclose(p, 0):
-                                print('{},{},({},{},{}) = {}'.format(n1,n2,lam, l2,l1, p))
                         p *= (-1)**(lam-l2)
                         P[mu+lam].append(p)
     return P
@@ -192,23 +206,20 @@ def tensor_to_P(tensor):
     Transform an arbitray SO(3) tensor into P which transforms under the irreducible
     representation with l = 1
     """
-    T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
     p = np.array(get_P(tensor))
     p_real = []
-    print(np.array(p).round(6))
     for pi in np.array(p).T:
         p_real.append(T.dot(pi)[[2,0,1]])
     p = np.array(p_real).T
-    print(p.round(6))
-    # print(p.imag.round(6))
+    if not np.allclose(p.imag,np.zeros_like(p)):
+        raise Exception('Ooops, something went wrong. P not purely real.')
     return p.real.T
 
-def get_elfcs_angles(tensor, order, i, coords):
+def get_elfcs_angles(tensor, i, coords):
     """Use the ElF algorithm to get angles relating global to local CS
     """
     norm = np.linalg.norm
-    P = tensor_to_P(tensor)
-    p = P[order]
+    p = tensor_to_P(tensor)
     axis1 = p[0]/norm(p[0])
 
     for d in p[1:]:
@@ -222,8 +233,9 @@ def get_elfcs_angles(tensor, order, i, coords):
         dr = norm((coords - c), axis =1)
         order = np.argsort(dr)
         for o in order:
-            axis2 = c - coords[o]
+            axis2 = coords[o] - c
             if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
+                print(axis1.dot(axis2))
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')
