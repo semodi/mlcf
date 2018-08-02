@@ -155,6 +155,7 @@ def get_P(tensor, wig3j = None):
     # It is faster to pre-evaluate the wigner-3j symbol, even faster if it is passed
     if not isinstance(wig3j, np.ndarray):
         wig3j = np.zeros([n_l,n_l,2*n_l+1,2*n_l+1,2*n_l+1])
+        wig3j = wig3j.astype(np.complex128)
         for l1 in range(n_l):
             for l2 in range(n_l):
                 for m in range(-lam,lam+1):
@@ -173,8 +174,15 @@ def get_P(tensor, wig3j = None):
                         for m in range(-n_l, n_l+1):
                             wig = wig3j[l2,l1,mu,(m-mu),-m]
                             if wig != 0:
-                                p += tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
-                                (-1)**m * wig
+                                add = tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
+                                  (-1)**m * wig
+                                p += add
+#                                if mu == 0 and not np.allclose(add, 0):
+#                                    print('({},{},{},{},{},{}) = {}'.format(lam, l2,l1,mu,(m-mu),-m, wig))
+#                                p += tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
+#                                (-1)**m * wig
+                        if mu == 0 and not np.allclose(p, 0):
+                                print('{},{},({},{},{}) = {}'.format(n1,n2,lam, l2,l1, p))
                         p *= (-1)**(lam-l2)
                         P[mu+lam].append(p)
     return P
@@ -184,12 +192,15 @@ def tensor_to_P(tensor):
     Transform an arbitray SO(3) tensor into P which transforms under the irreducible
     representation with l = 1
     """
-    T = np.array([[1j,0,1j], [0,-np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
+    T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
     p = np.array(get_P(tensor))
     p_real = []
+    print(np.array(p).round(6))
     for pi in np.array(p).T:
         p_real.append(T.dot(pi)[[2,0,1]])
     p = np.array(p_real).T
+    print(p.round(6))
+    # print(p.imag.round(6))
     return p.real.T
 
 def get_elfcs_angles(tensor, order, i, coords):

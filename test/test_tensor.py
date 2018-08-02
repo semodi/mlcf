@@ -22,6 +22,7 @@ def test_casimir():
         casimir_rotated = get_casimir(rotated)
         for key in casimir:
             assert np.allclose(casimir[key],casimir_rotated[key])
+
 def test_identity():
 
     elf = pickle.load(open('test/descr_local.dat','rb'))
