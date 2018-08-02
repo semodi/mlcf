@@ -264,13 +264,20 @@ def get_nncs_angles(i, coords):
     norm = np.linalg.norm
     c = np.array(coords[i])
     coords_sorted = np.array(coords)
-    coords_sorted = np.delete(coords_sorted, i , axis = 0)
-    order = np.argsort(np.linalg.norm(coords_sorted - c, axis = 1))
+    coords_sorted = np.delete(coords_sorted, i , axis = 0) -c
+    order = np.argsort(np.linalg.norm(coords_sorted, axis = 1))
     coords_sorted = coords_sorted[order[::-1]]
 
-    axis1 = coords_sorted[0] - c
+    axis1 = coords_sorted[0]
     axis1 = axis1/norm(axis1)
-    axis2 = coords_sorted[1] - c
+
+    for cs in coords_sorted:
+        axis2 = cs
+        if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
+            break
+    else:
+        raise Exception('Could not determine orientation. Aborting...')
+
     axis3 = np.cross(axis1, axis2)
     axis3 /= norm(axis3)
     axis2 = np.cross(axis3, axis1)
