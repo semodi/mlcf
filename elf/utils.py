@@ -20,7 +20,11 @@ def get_view(profile = 'default'):
     print('Clients operating : {}'.format(len(client.ids)))
     n_clients = len(client.ids)
     return view
-    
+
+def __get_elfs(path, atoms, basis, method):
+    density = elf.siesta.get_density(path)
+    return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
+
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
     add_ext = 'out', method = 'elf', view = serial_view()):
 
@@ -34,13 +38,13 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
         paths += [branch[0] + '/' + f for f in files]
 
     atoms = view.map_sync(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths])
-    densities = view.map_sync(elf.siesta.get_density, [p + '.' + dens_ext for p in paths])
-    elfs = view.map_sync(elf.real_space.get_elfs, atoms, densities, [basis]*len(atoms))
-    oriented = view.map_sync(elf.real_space.orient_elfs, elfs, atoms, [method]*len(atoms))
+    elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
+     atoms, [basis]*len(atoms), [method]*len(atoms))
 
-    elfs_to_hdf5(oriented, root + '_processed.hdf5')
+
+    elfs_to_hdf5(elfs, root + '_processed.hdf5')
     write(root +'.traj', atoms)
-    return oriented
+    return elfs
 
 def elfs_to_hdf5(elfs, path):
 

@@ -234,7 +234,7 @@ def get_elfs_oriented(atoms, density, basis, mode = 'elf'):
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
     """
-    return orient_elfs(get_elf(atoms, density, basis), atoms, mode)
+    return orient_elfs(get_elfs(atoms, density, basis), atoms, mode)
 
 def orient_elfs(elfs, atoms, mode = 'elf'):
     """
