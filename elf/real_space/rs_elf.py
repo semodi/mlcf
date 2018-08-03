@@ -8,6 +8,9 @@ import time
 from ase import Atoms
 from .density import Density
 from ase.units import Bohr
+from elf.geom import get_nncs_angles, get_elfcs_angles
+from elf.geom import make_real, rotate_tensor
+from elf import ElF
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -196,7 +199,7 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
     return coeff
 
-def get_elf(atoms, density, basis):
+def get_elfs(atoms, density, basis):
     '''
     Given an input density and an ASE Atoms object decompose the
     complete charge density into atomic ELFs
@@ -212,9 +215,44 @@ def get_elf(atoms, density, basis):
 
     Returns:
     --------
-    list; list containing the real atomic ELFs as dictionaries'''
+    list; list containing the complex atomic ELFs as dictionaries'''
 
     elfs = []
     for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
-        elfs.append(atomic_elf(pos, density, basis, sym))
+        rel_basis = {} #relevant basis entries
+        for b in basis:
+            if sym.lower() == b.lower()[-1]:
+                rel_basis[b] = basis[b]
+        elfs.append(ElF(atomic_elf(pos, density, basis, sym),
+            [0,0,0],rel_basis, sym))
+
     return elfs
+
+def get_elfs_oriented(atoms, density, basis, mode = 'elf'):
+    """
+    Like get_elfs, but returns real, oriented elfs
+    mode = {'elf': Use the ElF algorithm to orient fingerprint,
+            'nn': Use nearest neighbor algorithm}
+    """
+    return orient_elfs(get_elf(atoms, density, basis), atoms, mode)
+
+def orient_elfs(elfs, atoms, mode = 'elf'):
+    """
+    Takes a list of electric fingerprints and orients them according
+    to the rule specified in mode.
+    mode = {'elf': Use the ElF algorithm to orient fingerprint,
+                'nn': Use nearest neighbor algorithm}
+    """
+    oriented_elfs = []
+    if mode == 'elf':
+        angles_getter = get_elfcs_angles
+    elif mode == 'nn':
+        angles_getter = get_nncs_angles
+    else:
+        raise Exception('Unkown mode: {}'.format(mode))
+
+    for i, elf in enumerate(elfs):
+        angles = angles_getter(i, atoms.get_positions(), elf.value)
+        oriented = make_real(rotate_tensor(elf.value, angles, True))
+        oriented_elfs.append(ElF(oriented,angles, elf.basis,elf.species))
+    return oriented_elfs

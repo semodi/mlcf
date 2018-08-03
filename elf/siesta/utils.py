@@ -3,8 +3,11 @@
 import numpy as np
 import struct
 from ase.units import Bohr
+from elf.real_space.density import Density
+from ase import Atoms
+import re
 
-def get_data_bin(file_path):
+def get_density_bin(file_path):
     """ Same as get_data for binary (unformatted) files
     """
     #Warning: Only works for cubic cells!!!
@@ -28,9 +31,9 @@ def get_data_bin(file_path):
     content = np.array(struct.unpack(block,bin_file.read(struct.calcsize(block))))
 
     rho = content.reshape(a+2, a, a, order = 'F')[1:-1,:,:]
-    return rho, unitcell*Bohr, grid
+    return Density(rho, unitcell*Bohr, grid)
 
-def get_data(file_path):
+def get_density(file_path):
     """Import data from RHO file (or similar real-space grid files)
     Data is saved in global variables.
 
@@ -78,4 +81,89 @@ def get_data(file_path):
     # closed shell -> we don't care about spin.
     rho = rho[:, :, :, 0]
     grid = grid[:3]
-    return rho, unitcell*Bohr, grid
+    return Density(rho, unitcell*Bohr, grid)
+
+def get_energy(path, keywords=['Total']):
+    """find energy values specified by keywords
+    in siesta output file.
+    """
+
+    assert isinstance(keywords, (list, tuple))
+    values = []
+    with open(path, 'r') as file:
+        for keyword in keywords:
+            file.seek(0)
+            p = re.compile('siesta:.*' + keyword + ' =.*-?\d*.?\d*')
+            p_wo = re.compile('siesta:.*' + keyword + ' =\s*')
+            content = file.read()
+            with_number = p.findall(content)[0]
+            wo_number = p_wo.findall(content)[0]
+
+            values.append((float)(with_number[len(wo_number):]))
+
+    return values
+
+def get_forces(path):
+    with open(path, 'r') as infile:
+        infile.seek(0)
+
+        p = re.compile("siesta: Atomic forces \(eV/Ang\):\nsiesta:.*siesta:    Tot ", re.DOTALL)
+        p2 = re.compile(" 1 .*siesta: -", re.DOTALL)
+        alltext = p.findall(infile.read())
+        alltext = p2.findall(alltext[0])
+        alltext = alltext[0][:-len('\nsiesta: -')]
+        forces = []
+        for i, f in enumerate(alltext.split()):
+            if i%5 ==0: continue
+            if f =='siesta:': continue
+            forces.append(float(f))
+    return np.array(forces).reshape(-1,3)
+
+
+def get_atoms(path):
+    def find_coords(path):
+        with open(path, 'r') as infile:
+            infile.seek(0)
+
+            p = re.compile("%block AtomicCoordinatesAndAtomicSpecies.*%endblock AtomicCoordinatesAndAtomicSpecies",
+                           re.DOTALL)
+            alltext = p.findall(infile.read())
+            return(np.array(alltext[0].split()[2:-2]).reshape(-1,4).astype(float))
+
+    def find_chem_species(path):
+        with open(path, 'r') as infile:
+            infile.seek(0)
+
+            p = re.compile("%block ChemicalSpeciesLabel.*?%endblock ChemicalSpeciesLabel",
+                           re.DOTALL)
+            alltext = p.findall(infile.read())
+            return(np.array(alltext[0].split()[2:-2]).reshape(-1,3))
+
+    def find_unit_cell(path):
+        with open(path, 'r') as infile:
+            infile.seek(0)
+            p = re.compile("%block LatticeVectors.*?%endblock LatticeVectors",
+                           re.DOTALL)
+            alltext = p.findall(infile.read())
+            lattice_vec = np.array(alltext[0].split()[2:-2]).reshape(-1,3).astype(float)
+            infile.seek(0)
+            p = re.compile("LatticeConstant\s*\d*",
+                           re.DOTALL)
+            alltext = p.findall(infile.read())
+            a = alltext[0]
+            a = np.array(re.compile("\d+").findall(a)[0]).astype(float)
+            return lattice_vec * a
+
+    chem_species_array = find_chem_species(path)
+    chem_species = {}
+    for c in chem_species_array:
+        chem_species[int(c[0])] = c[2]
+
+    atom_string = ''
+    coords = find_coords(path)
+    for c in coords:
+        atom_string += chem_species[int(c[3])]
+    atoms = Atoms(atom_string, positions = coords[:,:3])
+    atoms.set_pbc(True)
+    atoms.set_cell(find_unit_cell(path))
+    return atoms

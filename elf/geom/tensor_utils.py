@@ -219,7 +219,7 @@ def tensor_to_P(tensor):
         raise Exception('Ooops, something went wrong. P not purely real.')
     return p.real.T
 
-def get_elfcs_angles(tensor, i, coords):
+def get_elfcs_angles(i, coords, tensor):
     """Use the ElF algorithm to get angles relating global to local CS
     """
     norm = np.linalg.norm
@@ -255,25 +255,26 @@ def get_elfcs_angles(tensor, i, coords):
     angles = get_euler_angles(np.array([axis1, axis2, axis3]))
     return angles
 
-def get_nncs_angles(i, coords):
-    """ Get euler angles to rotate to the local CS or coords[i] that is
+def get_nncs_angles(i, coords, tensor = None):
+    """ Get euler angles to rotate to the local CS for coords[i] that is
      oriented according to the nearest neighbor rule
     """
-    #TODO: Test for collinearity
 
     norm = np.linalg.norm
     c = np.array(coords[i])
     coords_sorted = np.array(coords)
-    coords_sorted = np.delete(coords_sorted, i , axis = 0) -c
-    order = np.argsort(np.linalg.norm(coords_sorted, axis = 1))
-    coords_sorted = coords_sorted[order[::-1]]
+    coords_sorted = np.delete(coords_sorted, i , axis = 0)
+    order = np.argsort(np.linalg.norm(coords_sorted - c, axis = 1))
+    coords_sorted = coords_sorted[order]
 
-    axis1 = coords_sorted[0]
+    axis1 = coords_sorted[0] - c
     axis1 = axis1/norm(axis1)
 
-    for cs in coords_sorted:
-        axis2 = cs
+    for u, cs in enumerate(coords_sorted[1:]):
+        axis2 = cs - c
         if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
+            # print(order)
+            # print("i = {}, Using {}".format(i, order[u+1]))
             break
     else:
         raise Exception('Could not determine orientation. Aborting...')
