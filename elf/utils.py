@@ -6,19 +6,38 @@ from ase import Atoms
 from ase.io import write
 import os
 from elf import ElF
+import ipyparallel as ipp
 
+class serial_view():
+    def __init__(self):
+        pass
+    def map_sync(self, *args):
+        return list(map(*args))
+
+def get_view(profile = 'default'):
+    client = ipp.Client()
+    view = client.load_balanced_view()
+    print('Clients operating : {}'.format(len(client.ids)))
+    n_clients = len(client.ids)
+    return view
+    
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
-    add_ext = 'out', method = 'elf'):
+    add_ext = 'out', method = 'elf', view = serial_view()):
 
+    if root[0] != '/' and root[0] != '~':
+        root = os.getcwd() + '/' + root
     paths = []
+
     for branch in os.walk(root):
-        files = np.unique([t.split('.')[0] for t in branch[2]])
+        files = np.unique([t.split('.')[0] for t in branch[2] if\
+            (dens_ext in t or add_ext in t)])
         paths += [branch[0] + '/' + f for f in files]
 
-    atoms = list(map(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths]))
-    densities = list(map(elf.siesta.get_density, [p + '.' + dens_ext for p in paths]))
-    elfs = list(map(elf.real_space.get_elfs, atoms, densities, [basis]*len(atoms)))
-    oriented = list(map(elf.real_space.orient_elfs, elfs, atoms, [method]*len(atoms)))
+    atoms = view.map_sync(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths])
+    densities = view.map_sync(elf.siesta.get_density, [p + '.' + dens_ext for p in paths])
+    elfs = view.map_sync(elf.real_space.get_elfs, atoms, densities, [basis]*len(atoms))
+    oriented = view.map_sync(elf.real_space.orient_elfs, elfs, atoms, [method]*len(atoms))
+
     elfs_to_hdf5(oriented, root + '_processed.hdf5')
     write(root +'.traj', atoms)
     return oriented
@@ -65,7 +84,7 @@ def elfs_to_hdf5(elfs, path):
     file['angles'] = np.array(angles)
     file['system'] = np.array(systems)
     file.flush()
-    
+
 def hdf5_to_elfs(path, species_filter = ''):
     file = h5py.File(path, 'r')
     basis = json.loads(file.attrs['basis'])
