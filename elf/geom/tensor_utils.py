@@ -223,7 +223,7 @@ def get_elfcs_angles(i, coords, tensor):
     """Use the ElF algorithm to get angles relating global to local CS
     """
     norm = np.linalg.norm
-    p = tensor_to_P(tensor)
+    p = tensor_to_P(tensor)[:,[2,0,1]] # Go from tensor to euclidean ordering
     axis1 = p[0]/norm(p[0])
 
     for d in p[1:]:

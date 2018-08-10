@@ -94,7 +94,7 @@ def elfs_to_hdf5(elfs, path):
 def hdf5_to_elfs(path, species_filter = ''):
     file = h5py.File(path, 'r')
     basis = json.loads(file.attrs['basis'])
-
+    print(basis)
     elfs = []
     current_system = -1
     for value, length, species, angles, system in zip(file['value'],
@@ -110,7 +110,7 @@ def hdf5_to_elfs(path, species_filter = ''):
             elfs.append([])
             current_system = system
 
-        bas =  dict(filter(lambda x: str(species) in x[0], basis.items()))
+        bas =  dict(filter(lambda x: species.astype(str).lower() in x[0].lower(), basis.items()))
         elfs[system].append(ElF(value[:length], angles, bas, species.astype(str)))
 
     return elfs
