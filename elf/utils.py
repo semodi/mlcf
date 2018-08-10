@@ -37,6 +37,8 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
             (dens_ext in t or add_ext in t)])
         paths += [branch[0] + '/' + f for f in files]
 
+    print('{} systems found. Processing ...'.format(len(paths)))
+
     atoms = view.map_sync(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths])
     elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
      atoms, [basis]*len(atoms), [method]*len(atoms))
