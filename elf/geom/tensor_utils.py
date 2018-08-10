@@ -222,13 +222,27 @@ def tensor_to_P(tensor):
 def get_elfcs_angles(i, coords, tensor):
     """Use the ElF algorithm to get angles relating global to local CS
     """
-    norm = np.linalg.norm
-    p = tensor_to_P(tensor)[:,[2,0,1]] # Go from tensor to euclidean ordering
-    axis1 = p[0]/norm(p[0])
 
-    for d in p[1:]:
-        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-3:
+    n_max, l_max = get_max(tensor)
+    if l_max > 1:
+        p = []
+        for n in range(n_max):
+            p_real = np.array([tensor['{},1,-1'.format(n)],
+                tensor['{},1,0'.format(n)],tensor['{},1,1'.format(n)]])
+            p_real = T.dot(p_real)[[2,0,1]]
+            p.append(p_real.real)
+        p = np.array(p)
+
+    norm = np.linalg.norm
+    p_extended = tensor_to_P(tensor)
+    p = np.concatenate([p, p_extended], axis = 0).astype(float)
+
+    axis1 = p[0]/norm(p[0]) #TODO: Check for size, skip if not large enough
+
+    for u, d in enumerate(p[1:]):
+        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-5:
             axis2 = d
+            print(u)
             break
     else:
         print('Using coordinates for alignment')
