@@ -145,27 +145,27 @@ def rotate_tensor(tensor, angles, inverse = False):
 
     n_max, l_max = get_max(tensor)
     for l in range(1,l_max):
-        if not '0,{},0'.format(l) in tensor:
-            break
+        # if not '0,{},0'.format(l) in tensor:
+            # break
         R[l] = sf.Wigner_D_element(*angles,np.array([l])).reshape(2*l+1,2*l+1)
 
     tensor_rotated = {}
     for n in range(n_max):
-        if not '{},0,0'.format(n) in tensor:
-            break
+        # if not '{},0,0'.format(n) in tensor:
+            # break
 
         tensor_rotated['{},0,0'.format(n)] = tensor['{},0,0'.format(n)]
         for l in range(1, l_max):
-            if not '0,{},0'.format(l) in tensor:
-                break
+            # if not '0,{},0'.format(l) in tensor:
+                # break
             t = []
             for m in range(-l,l+1):
                 t.append(tensor['{},{},{}'.format(n,l,m)])
             t = np.array(t)
             if inverse:
-                t_rotated = R[l].T.conj().dot(t)
+                t_rotated = R[l].T.dot(t)
             else:
-                t_rotated = R[l].dot(t)
+                t_rotated = R[l].conj().dot(t)
             for m in range(-l,l+1):
                 tensor_rotated['{},{},{}'.format(n,l,m)] = t_rotated[l+m]
     return tensor_rotated
@@ -234,18 +234,19 @@ def get_elfcs_angles(i, coords, tensor):
         p = np.array(p)
 
     norm = np.linalg.norm
+    # p = tensor_to_P(tensor)
     p_extended = tensor_to_P(tensor)
     p = np.concatenate([p, p_extended], axis = 0).astype(float)
 
+    print(norm(p[0]))
     axis1 = p[0]/norm(p[0]) #TODO: Check for size, skip if not large enough
-
     for u, d in enumerate(p[1:]):
         if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-5:
             axis2 = d
-            print(u)
+            # print('{},{}'.format(i,u))
             break
     else:
-        print('Using coordinates for alignment')
+        print('{}, Using coordinates for alignment'.format(i))
         c = np.array(coords[i])
         coords = np.delete(coords, i, axis = 0)
         dr = norm((coords - c), axis =1)

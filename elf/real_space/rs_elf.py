@@ -253,6 +253,6 @@ def orient_elfs(elfs, atoms, mode = 'elf'):
 
     for i, elf in enumerate(elfs):
         angles = angles_getter(i, atoms.get_positions(), elf.value)
-        oriented = make_real(rotate_tensor(elf.value, angles, True))
+        oriented = make_real(rotate_tensor(elf.value, -np.array(angles), True))
         oriented_elfs.append(ElF(oriented,angles, elf.basis,elf.species))
     return oriented_elfs
