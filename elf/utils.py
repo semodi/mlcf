@@ -7,6 +7,7 @@ from ase.io import write
 import os
 from elf import ElF
 import ipyparallel as ipp
+import re
 
 class serial_view():
     def __init__(self):
@@ -25,6 +26,15 @@ def __get_elfs(path, atoms, basis, method):
     density = elf.siesta.get_density(path)
     return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
 
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    '''
+    return [ atoi(c) for c in re.split('(\d+)', text) ]
+
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
     add_ext = 'out', method = 'elf', view = serial_view()):
 
@@ -37,6 +47,11 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
             (dens_ext in t or add_ext in t)])
         paths += [branch[0] + '/' + f for f in files]
 
+    # Sort path for custom directory structure node_*/*.ext
+
+    paths = sorted(paths, key=natural_keys)
+    
+    print(paths)
     print('{} systems found. Processing ...'.format(len(paths)))
 
     atoms = view.map_sync(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths])
