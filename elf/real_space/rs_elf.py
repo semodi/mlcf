@@ -48,7 +48,7 @@ def box_around(pos, radius, density, unit = 'A'):
 
     R = np.sqrt(X**2 + Y**2 + Z**2)
 
-    Phi = np.arctan2(Y,X) + np.pi
+    Phi = np.arctan2(Y,X)
     Theta = np.arccos(Z/R, where = (R != 0))
     Theta[R == 0] = 0
 
@@ -134,8 +134,8 @@ def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
     for l in range(n_l):
         angs.append([])
         for m in range(-l,l+1):
+            # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
             angs[l].append(sph_harm(m, l, Phi, Theta))
-
     #Build radial part of b.f.
     W = get_W(r_i, r_o, n_rad, gamma) # Matrix to orthogonalize radial basis
     rads = radials(R, r_i, r_o, W, gamma)
@@ -253,6 +253,6 @@ def orient_elfs(elfs, atoms, mode = 'elf'):
 
     for i, elf in enumerate(elfs):
         angles = angles_getter(i, atoms.get_positions(), elf.value)
-        oriented = make_real(rotate_tensor(elf.value, -np.array(angles), True))
+        oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
         oriented_elfs.append(ElF(oriented,angles, elf.basis,elf.species))
     return oriented_elfs

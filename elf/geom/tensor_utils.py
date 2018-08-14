@@ -31,10 +31,10 @@ def make_real(tensor):
     for n in range(n_max):
         for l in range(l_max):
             for m in range(-l,0):
-                tensor_real.append((-1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
+                tensor_real.append((1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
             tensor_real.append(tensor['{},{},{}'.format(n,l,0)].real)
             for m in range(1,l+1):
-                tensor_real.append((-1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,-m)]+(-1)**m*tensor['{},{},{}'.format(n,l,m)])).real)
+                tensor_real.append((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,-m)]+(-1)**m*tensor['{},{},{}'.format(n,l,m)])).real)
 
     return np.array(tensor_real)
 
@@ -48,8 +48,8 @@ def make_real_old(tensor):
     for n in range(n_max):
         for l in range(l_max):
             for m in range(-l,0):
-                tensor_real.append((-1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
-                tensor_real.append((-1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
+                tensor_real.append((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
+                tensor_real.append((1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
 #                assert np.allclose((-1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).imag,0)
 
             tensor_real.append(tensor['{},{},{}'.format(n,l,0)].real)
@@ -107,16 +107,22 @@ def rotate_vector(vec, angles, inverse = False):
     """ Rotate a real vector (euclidean order: xyz) with euler angles
         inverse = False: rotate vector
         inverse = True: rotate CS"""
+
+
     vec = vec[:,[1,2,0]]
     T_inv = np.conj(T.T)
 
-    R = T.dot(sf.Wigner_D_element(*angles,np.array([1])).reshape(3,3).dot(T_inv))
-    assert np.allclose(R.conj(), R)
+    D = sf.Wigner_D_element(*angles,np.array([1])).reshape(3,3)
 
     if inverse:
-        vec = np.einsum('ij,kj -> ki', R.T, vec)
-    else:
-        vec= np.einsum('ij,kj -> ki', R, vec)
+        D = D.conj().T
+
+    # D = D.conj()
+
+    R = T.dot(D.dot(T_inv))
+    assert np.allclose(R.conj(), R)
+
+    vec= np.einsum('ij,kj -> ki', R, vec)
 
     return vec[:,[2,0,1]].real
 
@@ -148,6 +154,9 @@ def rotate_tensor(tensor, angles, inverse = False):
         # if not '0,{},0'.format(l) in tensor:
             # break
         R[l] = sf.Wigner_D_element(*angles,np.array([l])).reshape(2*l+1,2*l+1)
+        if inverse:
+            R[l] = R[l].conj().T
+        # R[l] = R[l].conj()
 
     tensor_rotated = {}
     for n in range(n_max):
@@ -162,10 +171,7 @@ def rotate_tensor(tensor, angles, inverse = False):
             for m in range(-l,l+1):
                 t.append(tensor['{},{},{}'.format(n,l,m)])
             t = np.array(t)
-            if inverse:
-                t_rotated = R[l].T.dot(t)
-            else:
-                t_rotated = R[l].conj().dot(t)
+            t_rotated = R[l].dot(t)
             for m in range(-l,l+1):
                 tensor_rotated['{},{},{}'.format(n,l,m)] = t_rotated[l+m]
     return tensor_rotated
@@ -213,7 +219,7 @@ def tensor_to_P(tensor):
     p = np.array(get_P(tensor))
     p_real = []
     for pi in np.array(p).T:
-        p_real.append(T.dot(pi)[[2,0,1]])
+        p_real.append((T.dot(pi))[[2,0,1]])
     p = np.array(p_real).T
     if not np.allclose(p.imag,np.zeros_like(p)):
         raise Exception('Ooops, something went wrong. P not purely real.')
@@ -229,7 +235,7 @@ def get_elfcs_angles(i, coords, tensor):
         for n in range(n_max):
             p_real = np.array([tensor['{},1,-1'.format(n)],
                 tensor['{},1,0'.format(n)],tensor['{},1,1'.format(n)]])
-            p_real = T.dot(p_real)[[2,0,1]]
+            p_real = (T.dot(p_real))[[2,0,1]]
             p.append(p_real.real)
         p = np.array(p)
 
@@ -241,7 +247,7 @@ def get_elfcs_angles(i, coords, tensor):
     print(norm(p[0]))
     axis1 = p[0]/norm(p[0]) #TODO: Check for size, skip if not large enough
     for u, d in enumerate(p[1:]):
-        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-5:
+        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-3:
             axis2 = d
             # print('{},{}'.format(i,u))
             break
@@ -253,7 +259,7 @@ def get_elfcs_angles(i, coords, tensor):
         order = np.argsort(dr)
         for o in order:
             axis2 = coords[o] - c
-            if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
+            if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-3:
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')
@@ -287,7 +293,7 @@ def get_nncs_angles(i, coords, tensor = None):
 
     for u, cs in enumerate(coords_sorted[1:]):
         axis2 = cs - c
-        if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-5:
+        if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-3:
             # print(order)
             # print("i = {}, Using {}".format(i, order[u+1]))
             break
