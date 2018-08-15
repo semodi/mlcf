@@ -244,7 +244,6 @@ def get_elfcs_angles(i, coords, tensor):
     p_extended = tensor_to_P(tensor)
     p = np.concatenate([p, p_extended], axis = 0).astype(float)
 
-    print(norm(p[0]))
     axis1 = p[0]/norm(p[0]) #TODO: Check for size, skip if not large enough
     for u, d in enumerate(p[1:]):
         if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-3:
@@ -252,7 +251,7 @@ def get_elfcs_angles(i, coords, tensor):
             # print('{},{}'.format(i,u))
             break
     else:
-        print('{}, Using coordinates for alignment'.format(i))
+        # print('{}, Using coordinates for alignment'.format(i))
         c = np.array(coords[i])
         coords = np.delete(coords, i, axis = 0)
         dr = norm((coords - c), axis =1)

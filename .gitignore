@@ -107,3 +107,4 @@ venv.bak/
 test/rho/
 test/*/
 basis/
+data/
