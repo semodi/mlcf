@@ -311,3 +311,12 @@ def get_nncs_angles(i, coords, tensor = None):
     angles = get_euler_angles(np.array([axis1, axis2, axis3]))
 
     return angles
+
+def fold_back_coords(i, coords, unitcell):
+    if not np.allclose(unitcell, np.eye(3)*unitcell[0,0]):
+        raise Exception('fold_back_coords not implemented for non_cubic unitcells')
+    coords = coords
+    coords = coords.reshape(-1,3)
+    rel_c = coords - coords[i:i+1]
+    coords += -np.sign(rel_c)*unitcell[0,0]*(np.sign(np.abs(rel_c) - unitcell[0,0]*.5)+1)*.5
+    return coords

@@ -5,7 +5,7 @@ import pickle
 import elf.siesta as siesta
 from elf.geom import make_real, make_real_old, rotate_tensor, get_nncs_angles,\
  get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector
-from elf.real_space import Density, get_elfs
+from elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
 import numpy as np
 
@@ -14,8 +14,11 @@ basis = {'r_o_o': 1.0,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_o_h' : 1.5,
                       'n_l_h' : 2, 'gamma_o': 0, 'gamma_h': 0}
 atoms = read('./test/dimer.traj')
 elf = get_elfs(atoms, siesta.get_density('./test/0.RHOXC'), basis)
+elf_list = []
+elf_obj = elf
 for i, e in enumerate(elf):
-    elf[i] = e.value
+    elf_list.append(e.value)
+elf = elf_list
 
 def test_rotate_tensor():
     # Test identity and inverse
@@ -59,7 +62,7 @@ def test_nncs():
 
 def test_elfcs():
 
-    # Test the NNCS alignment (nearest-neighbor rule)
+    # Test the ElF alignment (ElF rule)
     for i in [0,1,4,0]:
         print(i)
         angles1 = get_elfcs_angles(i, atoms.get_positions(), elf[i])
@@ -82,6 +85,11 @@ def test_elfcs():
     for key in elf[0]:
         assert np.allclose(rotated1[key], elf_ref[key])
 
+def test_orient_elfs():
+    print(atoms.get_positions())
+    oriented = orient_elfs(elf_obj, atoms)[0].value
+    elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
+    assert np.allclose(make_real(elf_ref), oriented)
 
 if __name__ == '__main__':
     print('\n\n=======NNCS======\n\n')

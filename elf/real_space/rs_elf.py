@@ -9,8 +9,10 @@ from ase import Atoms
 from .density import Density
 from ase.units import Bohr
 from elf.geom import get_nncs_angles, get_elfcs_angles
-from elf.geom import make_real, rotate_tensor
+from elf.geom import make_real, rotate_tensor, fold_back_coords
 from elf import ElF
+from elf.utils import serial_view
+
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -199,7 +201,7 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
     return coeff
 
-def get_elfs(atoms, density, basis):
+def get_elfs(atoms, density, basis, view = serial_view()):
     '''
     Given an input density and an ASE Atoms object decompose the
     complete charge density into atomic ELFs
@@ -217,24 +219,39 @@ def get_elfs(atoms, density, basis):
     --------
     list; list containing the complex atomic ELFs as dictionaries'''
 
-    elfs = []
+    density_list = []
+    pos_list = []
+    sym_list = []
+    basis_list = []
+
     for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
         rel_basis = {} #relevant basis entries
         for b in basis:
             if sym.lower() == b.lower()[-1]:
                 rel_basis[b] = basis[b]
-        elfs.append(ElF(atomic_elf(pos, density, basis, sym),
-            [0,0,0],rel_basis, sym))
+        if len(rel_basis) == 0: continue   # Skip atoms for which no basis provided
+
+        box = box_around(pos, basis['r_o_' + sym.lower()], density)
+        density_list.append(Density(density.rho[box['mesh']],
+                                                density.unitcell,
+                                                density.grid))
+        pos_list.append(pos)
+        sym_list.append(sym)
+        basis_list.append(rel_basis)
+    values = view.map_sync(atomic_elf,pos_list, density_list, basis_list, sym_list)
+    elfs = []
+    for v,b,s in zip(values, basis_list, sym_list):
+        elfs.append(ElF(v,[0,0,0],rel_basis, sym, density.unitcell))
 
     return elfs
 
-def get_elfs_oriented(atoms, density, basis, mode = 'elf'):
+def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
     """
     Like get_elfs, but returns real, oriented elfs
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
     """
-    return orient_elfs(get_elfs(atoms, density, basis), atoms, mode)
+    return orient_elfs(get_elfs(atoms, density, basis, view), atoms, mode)
 
 def orient_elfs(elfs, atoms, mode = 'elf'):
     """
@@ -252,7 +269,7 @@ def orient_elfs(elfs, atoms, mode = 'elf'):
         raise Exception('Unkown mode: {}'.format(mode))
 
     for i, elf in enumerate(elfs):
-        angles = angles_getter(i, atoms.get_positions(), elf.value)
+        angles = angles_getter(i, fold_back_coords(i, atoms.get_positions(), elf.unitcell), elf.value)
         oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
-        oriented_elfs.append(ElF(oriented,angles, elf.basis,elf.species))
+        oriented_elfs.append(ElF(oriented,angles, elf.basis, elf.species, elf.unitcell))
     return oriented_elfs

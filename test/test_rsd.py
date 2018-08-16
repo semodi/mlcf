@@ -35,7 +35,7 @@ def test_rot_invariance_elfcs():
     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
 
 def test_rot_invariance_nncs():
-    elfs = preprocess_all('./test/monomers_rotated', basis,method = 'nn')
+    elfs = preprocess_all('./test/monomers_rotated', basis, method = 'nn')
     elfs = np.array([e[0].value for e in elfs])
     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
