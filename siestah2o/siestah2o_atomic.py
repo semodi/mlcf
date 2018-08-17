@@ -170,17 +170,6 @@ class SiestaH2OAtomic(Siesta):
         self.krr_h = krr_h
         self.corrected_f = True
 
-    def set_fd_model(self, krr_o_dx, krr_h_dx):
-        self.krr_o_dx = krr_o_dx
-        self.krr_h_dx = krr_h_dx
-        self.use_fd = True
-        self.corrected_f = True
-
-    def set_symmetry(self, sym):
-        if not isinstance(sym, np.ndarray):
-            raise Exception('sym must be np.ndarray')
-        else:
-            self.symmetry = sym
 
     def read_eigenvalues(self):
         pass

@@ -8,12 +8,7 @@ import numpy as np
 import pickle
 import siesta_utils.grid as siesta
 import ipyparallel as parallel
-
-
-#mask_o = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/O_mask', delimiter = ',',dtype = bool)
-#mask_h = np.genfromtxt('/gpfs/home/smdick/exchange_ml/models/H_mask', delimiter = ',',dtype = bool)
-mask_o = np.genfromtxt('/home/sebastian/Documents/Code/exchange_ml/models/O_mask', delimiter = ',',dtype = bool)
-mask_h = np.genfromtxt('/home/sebastian/Documents/Code/exchange_ml/models/H_mask', delimiter = ',',dtype = bool)
+import elf
 
 
 def find_h2o(atoms):
@@ -95,152 +90,40 @@ class MullikenGetter(FeatureGetter):
 #                    n_mol, basis, which_mol)
 #        return M
 
-
-
-def single_thread_descriptors_molecular(coords, rho_list, grid, uc, basis):
-    import os
-    os.environ['QT_QPA_PLATFORM']='offscreen'
-    import xcml
-    import siesta_utils.grid as siesta
-
-    siesta.grid = grid
-    siesta.unitcell = uc
-    all_descr = []
-    all_angles = []
-    for i, [c, rho, al] in enumerate(zip(coords,rho_list, ['o','h1','h2'])):
-        siesta.rho = rho
-        descr = xcml.atom_decomposition(coords, siesta, basis, al)
-
-        if al == 'h1':
-            descr *= np.array([1,-1,1,-1,1,-1,1,-1])
-
-        coords_folded = fold_back_coords(coords, siesta).reshape(3,3)
-        dist = np.linalg.norm(coords_folded - coords_folded[0], axis = 1)
-        if np.any(dist > 2.5):
-            raise Exception('Folding did not work')
-        coords_local = np.array(coords_folded)
-        for u, co in enumerate(coords_folded):
-            coords_local[u,:] = xcml.in_local_cs(co.reshape(1,-1), coords_folded)
-
-        other_coords = np.delete(coords_local, i , axis = 0)
-        c = coords_local[i]
-
-        if al =='o':
-            order = np.argsort(np.linalg.norm(other_coords - c,axis=1))
-            other_coords = other_coords[order]
-
-
-        if 'o' in al:
-            p_blocks = [1,10]
-            d_blocks = [4,13]
-        else:
-            p_blocks = [1,5]
-            d_blocks = []
-
-
-        _, angles = xcml.align_molecular(np.zeros([3,3]), c, other_coords) #TODO coords should be ALL water
-
-        descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
-
-        all_descr.append(descr)
-        all_angles.append(angles)
-
-    return [np.concatenate(all_descr), np.concatenate(all_angles)]
-
-
-def single_thread_descriptors_atomic(coords, rho_list, grid, uc, basis):
-    import os
-    os.environ['QT_QPA_PLATFORM']='offscreen'
-    import xcml
-    import siesta_utils.grid as siesta
-
-    siesta.grid = grid
-    siesta.unitcell = uc
-    all_descr = []
-    all_angles = []
-    for i, [c, rho, al] in enumerate(zip(coords,rho_list, ['o','h1','h2'])):
-        siesta.rho = rho
-        descr = xcml.atom_decomposition(coords, siesta, basis, al)
-
-        if al == 'h1':
-            descr *= np.array([1,-1,1,-1,1,-1,1,-1])
-
-        p = xcml.descr_to_P(descr, basis['n_rad_' + al[0]], basis['n_l_' + al[0]])
-
-        coords_folded = fold_back_coords(coords, siesta).reshape(3,3)
-        coords_local = np.array(coords_folded)
-        for u, co in enumerate(coords_folded):
-            coords_local[u,:] = xcml.in_local_cs(co.reshape(1,-1), coords_folded)
-
-
-        other_coords = np.delete(coords_local, i , axis = 0)
-        c = coords_local[i]
-
-        if 'o' in al:
-            p = p[:,mask_o]
-            p_blocks = [1,10]
-            d_blocks = [4,13]
-        else:
-            p = p[:,mask_h]
-            p_blocks = [1,5]
-            d_blocks = []
-
-        p, angles = xcml.align(p, c, other_coords) #TODO coords should be ALL water
-        descr = rotate_vector_real(descr.flatten(), angles, p_blocks, d_blocks, len(descr.flatten())).real
-
-        all_descr.append(descr)
-        all_angles.append(angles)
-
-    return [np.concatenate(all_descr), np.concatenate(all_angles)]
-
 class DescriptorGetter(FeatureGetter):
 
     def __init__(self, client = None):
         # client = parallel.Client(profile='default')
-        super().__init__(1, n_o_orb = 18, n_h_orb= 8, client = client)
+        super().__init__(1, n_o_orb = 0, n_h_orb= 0, client = client)
         self.basis = {'r_c_o': 1.0,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_c_h' : 1.5,
                       'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
-                      'n_l_h' : 2, 'gamma_o': 20, 'gamma_h': 15}
+                      'n_l_h' : 2, 'gamma_o': 0, 'gamma_h': 0}
 
         self.single_thread = single_thread_descriptors_molecular
-        print('changed')
-        self.scaler_o = None
-        self.scaler_h = None
+        self.scalers = {}
 
-    def set_scalers(self, scaler_o, scaler_h):
-        self.scaler_o = scaler_o
-        self.scaler_h = scaler_h
+    def set_scalers(self, scalers):
+        self.scalers = scalers
 
     def get_features(self, atoms):
-        # ========== Use if mulliken population oriented =========
-        h2o_indices = find_h2o(atoms)
-        coords = atoms.get_positions()[h2o_indices]
+        density = elf.siesta.get_density_bin('./H2O.RHOXC')
 
-        time_getfeat = Timer('TIME_GETFEAT')
-        siesta.get_data_bin('./H2O.RHOXC')
-        coords = coords.reshape(-1,3,3)
+        elfs = elf.real_space.get_elfs_oriented(atoms, density,
+                self.basis, self.view)
 
-        rho_snippets = []
-        for c in coords:
-            snippet = []
-            for a, l in zip(c,['o', 'h', 'h']):
-                snippet.append(siesta.rho[box_fast(a,
-                 self.basis['r_c_' + l], siesta)])
-            rho_snippets.append(snippet)
+        elfs_dict = {}
+        angles_dict = {}
+        for e in elfs:
+            if not e.species in elfs_dict:
+                elfs_dict[e.species] = []
+                angles_dict[e.species] = []
+            elfs_dict[e.species].append(e.value)
+            angles_dict[e.species].append(e.angles)
 
-        features = self.view.map_sync(self.single_thread, coords, rho_snippets,
-            [siesta.grid]*len(coords),[siesta.unitcell]*len(coords),
-            [self.basis]*len(coords))
+        for symbol in elfs_dict:
+            try:
+                elfs_dict[symbol] = self.scalers[symbol].transform(np.array(elfs_dict[symbol]))
+            except KeyError:
+                print("KeyError: No scaler provided for given atomic species {}".format(symbol))
 
-        descr = [f[0] for f in features]
-        angles = [f[1] for f in features]
-
-        time_getfeat.stop()
-        descr = np.array(descr)
-        descr[:,:self.n_o_orb] = self.scaler_o.transform(descr[:,:self.n_o_orb])
-        descr[:,self.n_o_orb:self.n_o_orb+self.n_h_orb] =\
-            self.scaler_h.transform(descr[:,self.n_o_orb:self.n_o_orb+self.n_h_orb])
-        descr[:,self.n_o_orb+self.n_h_orb:] =\
-            self.scaler_h.transform(descr[:,self.n_o_orb+self.n_h_orb:])
-        angles = np.array(angles).reshape(-1,3)
-        return descr, self.n_o_orb, self.n_h_orb, h2o_indices, angles
+        return elfs_dict, angles_dict
