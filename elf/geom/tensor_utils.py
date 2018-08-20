@@ -312,11 +312,10 @@ def get_nncs_angles(i, coords, tensor = None):
 
     return angles
 
-def fold_back_coords(i, coords, density):
-    # TODO: Make available for non cubic unitcells
-    if not np.allclose(density.unitcell, np.eye(3)*density.unitcell[0,0]):
-        raise Exception("fold_back_coords only implemented for cubic unitcells so far")
+def fold_back_coords(i, coords, unitcell):
+    if not np.allclose(unitcell, np.eye(3)*unitcell[0,0]):
+        raise Exception('fold_back_coords not implemented for non_cubic unitcells')
     coords = coords.reshape(-1,3)
-    rel_coords = coords - coords[i:i+1]
-    coords += -np.sign(rel_coords)*density.unitcell[0,0]*(np.sign(np.abs(rel_coords) - density.unitcell[0,0]*.5)+1)*.5
+    rel_c = coords - coords[i:i+1]
+    coords += -np.sign(rel_c)*unitcell[0,0]*(np.sign(np.abs(rel_c) - unitcell[0,0]*.5)+1)*.5
     return coords
