@@ -1,0 +1,17 @@
+diff --git a/elf/utils.py b/elf/utils.py
+index d5a4f08..6539c88 100644
+--- a/elf/utils.py
++++ b/elf/utils.py
+@@ -58,9 +58,9 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
+     elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
+      atoms, [basis]*len(atoms), [method]*len(atoms))
+ 
+-
+-    elfs_to_hdf5(elfs, root + '_processed.hdf5')
+-    write(root +'.traj', atoms)
++    name = root.split('/')[-1]
++    elfs_to_hdf5(elfs, name + '_processed.hdf5')
++    write(name +'.traj', atoms)
+     return elfs
+ 
+ def elfs_to_hdf5(elfs, path):
