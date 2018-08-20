@@ -241,7 +241,7 @@ def get_elfs(atoms, density, basis, view = serial_view()):
     values = view.map_sync(atomic_elf,pos_list, density_list, basis_list, sym_list)
     elfs = []
     for v,b,s in zip(values, basis_list, sym_list):
-        elfs.append(ElF(v,[0,0,0],rel_basis, sym, density.unitcell))
+        elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
 
     return elfs
 
