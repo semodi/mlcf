@@ -55,7 +55,6 @@ class MullikenGetter(FeatureGetter):
     def __init__(self, n_mol, client = None):
         # client = parallel.Client(profile='default')
         super().__init__(n_mol, n_o_orb = 13, n_h_orb= 5, client = client)
-        self.n_o_orb = 13
 
     def get_features(self, atoms, *args):
 #
@@ -99,7 +98,6 @@ class DescriptorGetter(FeatureGetter):
                       'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
                       'n_l_h' : 2, 'gamma_o': 0, 'gamma_h': 0}
 
-        self.single_thread = single_thread_descriptors_molecular
         self.scalers = {}
 
     def set_scalers(self, scalers):
@@ -125,5 +123,6 @@ class DescriptorGetter(FeatureGetter):
                 elfs_dict[symbol] = self.scalers[symbol].transform(np.array(elfs_dict[symbol]))
             except KeyError:
                 print("KeyError: No scaler provided for given atomic species {}".format(symbol))
+                raise KeyError
 
         return elfs_dict, angles_dict

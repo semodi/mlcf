@@ -206,50 +206,54 @@ class SiestaH2OAtomic(Siesta):
 
                 if self.feature_getter == None:
                     raise Exception("Feature getter not defined, cannot proceed...")
-                features, n_o_orb, n_h_orb, h2o_indices, angles =\
+                elfs_dict, angles_dict =\
                     self.feature_getter.get_features(atoms)
-                n_orb = n_o_orb + 2*n_h_orb
-                features_denorm = np.array(features).reshape(-1,n_orb)
-                features_denorm[:,:n_o_orb] =\
-                 self.feature_getter.scaler_o.inverse_transform(features_denorm[:,:n_o_orb])
-                features_denorm[:,n_o_orb:n_o_orb + n_h_orb] =\
-                  self.feature_getter.scaler_h.inverse_transform(features_denorm[:,n_o_orb:n_o_orb+n_h_orb])
-                features_denorm[:,n_o_orb+n_h_orb:] =\
-                  self.feature_getter.scaler_h.inverse_transform(features_denorm[:,n_o_orb+n_h_orb:])
-                features_denorm = features_denorm.reshape(features.shape)
+
                 time_ML = Timer("TIME_ML")
+                correction = 0
+                # if self.corrected_e:
+                #     self.nn_model = load_network(self.nn_path) # TEMP FIX
+                #     correction = use_model_descr(features_denorm.reshape(1,-1), n_mol,
+                #          nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, sym = self.symmetry)[0]
+                # else:
+                #     correction = 0
+                # Temporary
+                force_models = {}
+                force_models['o'] = self.krr_o
+                force_models['h'] = self.krr_h
 
-                if self.corrected_e:
-                    self.nn_model = load_network(self.nn_path) # TEMP FIX
-                    correction = use_model_descr(features_denorm.reshape(1,-1), n_mol,
-                         nn=self.nn_model, n_o_orb=n_o_orb, n_h_orb=n_h_orb, sym = self.symmetry)[0]
-                else:
-                    correction = 0
-                siesta.unitcell = np.zeros([3,3])
-                siesta.unitcell[0, 0] = atoms.get_cell()[0, 0]*AtoBohr #TEMP FIX
-
+                correction_force = np.zeros_like(forces)
                 if self.corrected_f:
-                    correction_force = use_force_model_atomic(features.reshape(-1,n_orb),self.krr_o,
-                        self.krr_h, n_o_orb=n_o_orb, n_h_orb=n_h_orb, glob_cs = True,
-                        coords = fold_back_coords(atoms.get_positions()[h2o_indices], siesta), angles=angles).reshape(-1,3)
-                else:
-                    correction_force = np.zeros_like(forces)
+                    prediction = {}
+                    for species in elfs_dict:
+                        prediction[species] = force_models[species].predict(elfs_dict[species])
+                        for i, (pred, e) in enumerate(zip(prediction[species],
+                            elfs_dict[species])):
 
-                if settings['cmcorrection']:
-                    # Subtract mean force
-                    mass_O = atoms.get_masses()[h2o_indices][0]
-                    mass_H = atoms.get_masses()[h2o_indices][1]
-                    mean_correction = np.mean(correction_force, axis = 0)/(mass_O + 2 * mass_H)
-                    correction_force[::3] -= mass_O * mean_correction * 3
-                    correction_force[1::3] -= mass_H * mean_correction * 3
-                    correction_force[2::3] -= mass_H * mean_correction * 3
-#
+                            prediction[species][i] = elf.geom.rotate_vector(pred,
+                                                                    e.angles, False)
+                for i, chem_sym in enumerate(atoms.get_chemical_symbols()):
+                    if chem_sym.lower() in prediction:
+                        correction_force[i] = prediction[chem_sym.lower()].pop(0)
+
+                for key in prediction:
+                    assert len(prediction(key)) == 0
+
+#                 if settings['cmcorrection']:
+#                     # Subtract mean force
+#                     mass_O = atoms.get_masses()[h2o_indices][0]
+#                     mass_H = atoms.get_masses()[h2o_indices][1]
+#                     mean_correction = np.mean(correction_force, axis = 0)/(mass_O + 2 * mass_H)
+#                     correction_force[::3] -= mass_O * mean_correction * 3
+#                     correction_force[1::3] -= mass_H * mean_correction * 3
+#                     correction_force[2::3] -= mass_H * mean_correction * 3
+# #
                 time_ML.stop()
-                pot_energy = pot_energy - correction - n_mol * offset_nn
-                forces[h2o_indices] = forces[h2o_indices] - correction_force.reshape(-1,3)
+                pot_energy = pot_energy + correction - n_mol * offset_nn
+                forces[h2o_indices] = forces[h2o_indices] + correction_force.reshape(-1,3)
                 if self.log_accuracy:
                     forces_uncorrected = np.array(forces)
-                    forces_uncorrected[h2o_indices] += correction_force.reshape(-1,3)
+                    forces_uncorrected[h2o_indices] -= correction_force.reshape(-1,3)
                     log_all(pot_energy + correction, pot_energy,
                          forces_uncorrected, forces,
                          features)

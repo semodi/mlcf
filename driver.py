@@ -1,5 +1,4 @@
 from siestah2o import SiestaH2O, Timer, DescriptorGetter, SiestaH2OAtomic
-from siestah2o import single_thread_descriptors_atomic, single_thread_descriptors_molecular
 from siestah2o import MullikenGetter, Mixer
 import numpy as np
 from ase import Atoms
@@ -97,11 +96,11 @@ if __name__ == '__main__':
             else:
                 descr_getter = DescriptorGetter()
 
-            if settings_choice['modelkind' + i] in ['atomic']:
-                descr_getter.single_thread = single_thread_descriptors_atomic
-            else:
-                descr_getter.single_thread = single_thread_descriptors_molecular
-
+            # if settings_choice['modelkind' + i] in ['atomic']:
+            #     descr_getter.single_thread = single_thread_descriptors_atomic
+            # else:
+            #     descr_getter.single_thread = single_thread_descriptors_molecular
+            #
             if  settings_choice['modelkind' + i] != 'none':
 
                 scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
@@ -133,7 +132,7 @@ if __name__ == '__main__':
             krr_h = pickle.load(open(model_path + 'force_H', 'rb'))
             calc.set_force_model(krr_o, krr_h)
             calc.set_solution_method(settings_choice['solutionmethod' + i])
-        
+
         #============MB-pol====================
         elif settings_choice['modelkind' + i] =='mbpol':
             h2o = reconnect_monomers(h2o)
