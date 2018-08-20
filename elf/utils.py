@@ -50,7 +50,7 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     # Sort path for custom directory structure node_*/*.ext
 
     paths = sorted(paths, key=natural_keys)
-    
+
     print(paths)
     print('{} systems found. Processing ...'.format(len(paths)))
 
@@ -126,6 +126,6 @@ def hdf5_to_elfs(path, species_filter = ''):
             current_system = system
 
         bas =  dict(filter(lambda x: species.astype(str).lower() in x[0].lower(), basis.items()))
-        elfs[system].append(ElF(value[:length], angles, bas, species.astype(str)))
+        elfs[system].append(ElF(value[:length], angles, bas, species.astype(str),np.zeros(3)))
 
     return elfs
