@@ -22,6 +22,7 @@ from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
 from read_input import settings, mixing_settings
 import elf
+import subprocess
 offset_nn = (-469.766523)
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -66,8 +67,6 @@ def log_all(energy_siesta = None, energy_corrected = None,
             pass
         with open('forces_corrected.dat', 'w') as file:
             pass
-        with open('features.dat', 'w') as file:
-            pass
     else:
         with open('energies.dat', 'a') as file:
             file.write('{:.4f}\t{:.4f}\n'.format(energy_siesta,
@@ -76,8 +75,9 @@ def log_all(energy_siesta = None, energy_corrected = None,
             np.savetxt(file, forces_siesta, fmt = '%.4f')
         with open('forces_corrected.dat', 'a') as file:
             np.savetxt(file, forces_corrected, fmt = '%.4f')
-        with open('features.dat', 'a') as file:
-            np.savetxt(file, features, fmt = '%.4f')
+        for key in features:
+            with open('features_{}.dat'.format(key), 'a') as file:
+                np.savetxt(file, features[key], fmt = '%.4f')
 
 
 
@@ -208,12 +208,11 @@ class SiestaH2OAtomic(Siesta):
 
             if self.corrected_e or self.corrected_f:
 
+                time_ML = Timer("TIME_ML")
                 if self.feature_getter == None:
                     raise Exception("Feature getter not defined, cannot proceed...")
                 elfs_dict, angles_dict =\
                     self.feature_getter.get_features(atoms)
-
-                time_ML = Timer("TIME_ML")
                 correction = 0
                 # if self.corrected_e:
                 #     self.nn_model = load_network(self.nn_path) # TEMP FIX
@@ -254,20 +253,29 @@ class SiestaH2OAtomic(Siesta):
 #                     correction_force[::3] -= mass_O * mean_correction * 3
 #                     correction_force[1::3] -= mass_H * mean_correction * 3
 #                     correction_force[2::3] -= mass_H * mean_correction * 3
-# #
+                features = {}
+                for key in elfs_dict:
+                    features[key] = np.concatenate([np.array(elfs_dict[key]),
+                                                    np.array(angles_dict[key])],
+                                                    axis = -1)
                 time_ML.stop()
+            else:
+                features = {}
+
             pot_energy = pot_energy + correction - n_mol * offset_nn
             forces = forces + correction_force.reshape(-1,3)
+
             if self.log_accuracy:
                 forces_uncorrected = np.array(forces)
                 forces_uncorrected -= correction_force.reshape(-1,3)
-                features = np.zeros([3,3])
                 log_all(pot_energy + correction, pot_energy,
                      forces_uncorrected, forces,
                      features)
             self.Epot = pot_energy
             self.forces = forces
             time_step.stop()
+            subprocess.call('rm fdf*', shell = True)
+            subprocess.call('rm INPUT*', shell = True)
         return self.Epot
 
     def get_forces(self, atoms):
