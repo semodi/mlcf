@@ -12,7 +12,7 @@ from elf.geom import get_nncs_angles, get_elfcs_angles
 from elf.geom import make_real, rotate_tensor, fold_back_coords
 from elf import ElF
 from elf.utils import serial_view
-from mytimer import Timer
+
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -201,7 +201,15 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
     return coeff
 
-def get_elfs(atoms, density, basis, view = serial_view()):
+def get_elf_oriented_thread(pos, density, basis, chem_symbol,
+    i, all_positions, mode = 'elf'):
+
+    return(orient_elf(i,
+        ElF(atomic_elf(pos, density, basis, chem_symbol),[0,0,0],basis,
+            chem_symbol,density.unitcell),all_positions,mode))
+
+
+def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     '''
     Given an input density and an ASE Atoms object decompose the
     complete charge density into atomic ELFs
@@ -224,7 +232,6 @@ def get_elfs(atoms, density, basis, view = serial_view()):
     sym_list = []
     basis_list = []
 
-    timer_map = Timer('TIME_BEFORE_MAP_SYNC')
     for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
         rel_basis = {} #relevant basis entries
         for b in basis:
@@ -239,13 +246,17 @@ def get_elfs(atoms, density, basis, view = serial_view()):
         pos_list.append(pos)
         sym_list.append(sym)
         basis_list.append(rel_basis)
-    timer_map.stop() 
-    timer_map = Timer('TIME_MAP_SYNC')
-    values = view.map_sync(atomic_elf,pos_list, density_list, basis_list, sym_list)
-    timer_map.stop()
-    elfs = []
-    for v,b,s in zip(values, basis_list, sym_list):
-        elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
+
+    if orient_mode == 'none':
+        values = view.map_sync(atomic_elf, pos_list, density_list, basis_list, sym_list)
+        elfs = []
+        for v,b,s in zip(values, basis_list, sym_list):
+            elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
+    else:
+        n_jobs = len(basis_list)
+        elfs = view.map_sync(get_elf_oriented_thread, pos_list, density_list,
+          basis_list, sym_list, np.arange(n_jobs),[atoms.get_positions()]*n_jobs,
+          [orient_mode]*n_jobs)
     return elfs
 
 def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
@@ -254,14 +265,9 @@ def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view())
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
     """
+    return get_elfs(atoms, density, basis, view, orient_mode = mode)
 
-    elfs = get_elfs(atoms, density, basis, view)
-    timer_orient = Timer("TIME_ORIENT")
-    oriented = orient_elfs(elfs, atoms, mode)
-    timer_orient.stop()
-    return oriented
-
-def orient_elfs(elfs, atoms, mode = 'elf'):
+def orient_elf(i, elf, all_pos, mode = 'elf'):
     """
     Takes a list of electric fingerprints and orients them according
     to the rule specified in mode.
@@ -276,8 +282,21 @@ def orient_elfs(elfs, atoms, mode = 'elf'):
     else:
         raise Exception('Unkown mode: {}'.format(mode))
 
+
+    angles = angles_getter(i, fold_back_coords(i, all_pos, elf.unitcell), elf.value)
+    oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
+    return(ElF(oriented, angles, elf.basis, elf.species, elf.unitcell))
+
+def orient_elfs(elfs, atoms, mode = 'elf'):
+    """
+    Takes a list of electric fingerprints and orients them according
+    to the rule specified in mode.
+    mode = {'elf': Use the ElF algorithm to orient fingerprint,
+                'nn': Use nearest neighbor algorithm}
+    """
+
+    oriented_elfs = []
     for i, elf in enumerate(elfs):
-        angles = angles_getter(i, fold_back_coords(i, atoms.get_positions(), elf.unitcell), elf.value)
-        oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
-        oriented_elfs.append(ElF(oriented,angles, elf.basis, elf.species, elf.unitcell))
+        oriented_elfs.append(orient_elf(i ,elf, atoms.get_positions(),mode))
+
     return oriented_elfs
