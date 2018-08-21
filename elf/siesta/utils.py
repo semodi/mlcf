@@ -31,7 +31,7 @@ def get_density_bin(file_path):
     content = np.array(struct.unpack(block,bin_file.read(struct.calcsize(block))))
 
     rho = content.reshape(a+2, a, a, order = 'F')[1:-1,:,:]
-    return Density(rho, unitcell*Bohr, grid)
+    return Density(rho, unitcell*Bohr, grid[:3])
 
 def get_density(file_path):
     """Import data from RHO file (or similar real-space grid files)
