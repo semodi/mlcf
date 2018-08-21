@@ -83,6 +83,7 @@ class SiestaH2O(Siesta):
 
     def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
 
+        if xc =='REVPBE': xc = 'revPBE'
         fdf_arguments = {'DM.MixingWeight': 0.3,
                               'MaxSCFIterations': 50,
                               'DM.NumberPulay': 3,
