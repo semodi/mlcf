@@ -12,7 +12,7 @@ from elf.geom import get_nncs_angles, get_elfcs_angles
 from elf.geom import make_real, rotate_tensor, fold_back_coords
 from elf import ElF
 from elf.utils import serial_view
-
+from mytimer import Timer
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -224,6 +224,7 @@ def get_elfs(atoms, density, basis, view = serial_view()):
     sym_list = []
     basis_list = []
 
+    timer_map = Timer('TIME_BEFORE_MAP_SYNC')
     for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
         rel_basis = {} #relevant basis entries
         for b in basis:
@@ -238,11 +239,13 @@ def get_elfs(atoms, density, basis, view = serial_view()):
         pos_list.append(pos)
         sym_list.append(sym)
         basis_list.append(rel_basis)
+    timer_map.stop() 
+    timer_map = Timer('TIME_MAP_SYNC')
     values = view.map_sync(atomic_elf,pos_list, density_list, basis_list, sym_list)
+    timer_map.stop()
     elfs = []
     for v,b,s in zip(values, basis_list, sym_list):
         elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
-
     return elfs
 
 def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
@@ -251,7 +254,12 @@ def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view())
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
     """
-    return orient_elfs(get_elfs(atoms, density, basis, view), atoms, mode)
+
+    elfs = get_elfs(atoms, density, basis, view)
+    timer_orient = Timer("TIME_ORIENT")
+    oriented = orient_elfs(elfs, atoms, mode)
+    timer_orient.stop()
+    return oriented
 
 def orient_elfs(elfs, atoms, mode = 'elf'):
     """
