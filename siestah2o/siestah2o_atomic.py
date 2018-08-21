@@ -21,7 +21,7 @@ import siesta_utils.grid as siesta
 from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
 from read_input import settings, mixing_settings
-
+import elf
 offset_nn = (-469.766523)
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -83,7 +83,9 @@ def log_all(energy_siesta = None, energy_corrected = None,
 
 class SiestaH2OAtomic(Siesta):
 
-    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = False):
+    def __init__(self, basis = 'qz', xc='BH', feature_getter = None, log_accuracy = True):
+
+        if xc =='REVPBE': xc = 'revPBE'
 
         fdf_arguments = {'DM.MixingWeight': 0.3,
                               'MaxSCFIterations': 50,
@@ -199,6 +201,8 @@ class SiestaH2OAtomic(Siesta):
             time_siesta = Timer("TIME_SIESTA_BARE")
             pot_energy = super().get_potential_energy(atoms)
             forces = super().get_forces(atoms)
+            correction = 0
+            correction_force = np.zeros_like(forces)
             time_siesta.stop()
             self.last_positions = atoms.get_positions()
 
@@ -222,22 +226,25 @@ class SiestaH2OAtomic(Siesta):
                 force_models['o'] = self.krr_o
                 force_models['h'] = self.krr_h
 
-                correction_force = np.zeros_like(forces)
                 if self.corrected_f:
                     prediction = {}
                     for species in elfs_dict:
-                        prediction[species] = force_models[species].predict(elfs_dict[species])
-                        for i, (pred, e) in enumerate(zip(prediction[species],
-                            elfs_dict[species])):
+                        prediction[species] = force_models[species.lower()].predict(elfs_dict[species])
+                        for i, (pred, e, a) in enumerate(zip(prediction[species],
+                            elfs_dict[species], angles_dict[species])):
 
-                            prediction[species][i] = elf.geom.rotate_vector(pred,
-                                                                    e.angles, False)
-                for i, chem_sym in enumerate(atoms.get_chemical_symbols()):
-                    if chem_sym.lower() in prediction:
-                        correction_force[i] = prediction[chem_sym.lower()].pop(0)
+                            prediction[species][i] = elf.geom.rotate_vector(np.array([pred]),
+                                                                    a, False)
 
                 for key in prediction:
-                    assert len(prediction(key)) == 0
+                    prediction[key] = prediction[key].tolist()
+
+                for i, chem_sym in enumerate(atoms.get_chemical_symbols()):
+                    if chem_sym in prediction:
+                        correction_force[i] = np.array(prediction[chem_sym].pop(0))
+
+                for key in prediction:
+                    assert len(prediction[key]) == 0
 
 #                 if settings['cmcorrection']:
 #                     # Subtract mean force
@@ -249,14 +256,15 @@ class SiestaH2OAtomic(Siesta):
 #                     correction_force[2::3] -= mass_H * mean_correction * 3
 # #
                 time_ML.stop()
-                pot_energy = pot_energy + correction - n_mol * offset_nn
-                forces[h2o_indices] = forces[h2o_indices] + correction_force.reshape(-1,3)
-                if self.log_accuracy:
-                    forces_uncorrected = np.array(forces)
-                    forces_uncorrected[h2o_indices] -= correction_force.reshape(-1,3)
-                    log_all(pot_energy + correction, pot_energy,
-                         forces_uncorrected, forces,
-                         features)
+            pot_energy = pot_energy + correction - n_mol * offset_nn
+            forces = forces + correction_force.reshape(-1,3)
+            if self.log_accuracy:
+                forces_uncorrected = np.array(forces)
+                forces_uncorrected -= correction_force.reshape(-1,3)
+                features = np.zeros([3,3])
+                log_all(pot_energy + correction, pot_energy,
+                     forces_uncorrected, forces,
+                     features)
             self.Epot = pot_energy
             self.forces = forces
             time_step.stop()

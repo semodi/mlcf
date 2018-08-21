@@ -27,7 +27,8 @@ from read_input import settings, mixing_settings
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
 #os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
-os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+# os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
+os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Physics/Code/siesta-4.1-b3/psf/'
 
 #Try to run siesta with mpi if that fails run serial version
 try:
@@ -105,7 +106,8 @@ if __name__ == '__main__':
 
                 scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
                 scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
-                descr_getter.set_scalers(scaler_o, scaler_h)
+                scalers = {'o': scaler_o, 'h': scaler_h}
+                descr_getter.set_scalers(scalers)
                 calc.set_feature_getter(descr_getter)
 
                 krr_o = keras.models.load_model(model_path + 'force_O')
@@ -168,9 +170,17 @@ if __name__ == '__main__':
                              logfile='../'+ settings['name'] + '.log')
 
     time_step = Timer('Timer')
-    for i in range(settings['Nt']):
-        time_step.start_timer()
-        dyn.run(1)
-        if settings['mixing']:
-            h2o.calc.increment_step()
-        time_step.stop()
+    if settings['integrator'] == 'none':
+        frame_list = read('../' + settings['xyzpath'], ':')
+        for frame in frame_list:
+            time_step.start_timer()
+            h2o.set_positions(frame.get_positions())
+            h2o.get_potential_energy()
+            time_step.stop()
+    else:
+        for i in range(settings['Nt']):
+            time_step.start_timer()
+            dyn.run(1)
+            if settings['mixing']:
+                h2o.calc.increment_step()
+            time_step.stop()

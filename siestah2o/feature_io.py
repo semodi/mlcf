@@ -94,7 +94,7 @@ class DescriptorGetter(FeatureGetter):
     def __init__(self, client = None):
         # client = parallel.Client(profile='default')
         super().__init__(1, n_o_orb = 0, n_h_orb= 0, client = client)
-        self.basis = {'r_c_o': 1.0,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_c_h' : 1.5,
+        self.basis = {'r_o_o': 0.9,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_o_h' : 1.35,
                       'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
                       'n_l_h' : 2, 'gamma_o': 0, 'gamma_h': 0}
 
@@ -107,7 +107,7 @@ class DescriptorGetter(FeatureGetter):
         density = elf.siesta.get_density_bin('./H2O.RHOXC')
 
         elfs = elf.real_space.get_elfs_oriented(atoms, density,
-                self.basis, self.view)
+                self.basis, 'elf', self.view)
 
         elfs_dict = {}
         angles_dict = {}
@@ -120,7 +120,7 @@ class DescriptorGetter(FeatureGetter):
 
         for symbol in elfs_dict:
             try:
-                elfs_dict[symbol] = self.scalers[symbol].transform(np.array(elfs_dict[symbol]))
+                elfs_dict[symbol] = self.scalers[symbol.lower()].transform(np.array(elfs_dict[symbol]))
             except KeyError:
                 print("KeyError: No scaler provided for given atomic species {}".format(symbol))
                 raise KeyError
