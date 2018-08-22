@@ -203,10 +203,11 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
 def get_elf_oriented_thread(pos, density, basis, chem_symbol,
     i, all_positions, mode = 'elf'):
+    e = ElF(atomic_elf(pos, density, basis, chem_symbol),[0,0,0],basis,
+        chem_symbol,density.unitcell)
+    elf_oriented = orient_elf(i,e,all_positions,mode) 
 
-    return(orient_elf(i,
-        ElF(atomic_elf(pos, density, basis, chem_symbol),[0,0,0],basis,
-            chem_symbol,density.unitcell),all_positions,mode))
+    return(elf_oriented)
 
 
 def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
@@ -254,9 +255,11 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
             elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
     else:
         n_jobs = len(basis_list)
+        all_pos = atoms.get_positions()
         elfs = view.map_sync(get_elf_oriented_thread, pos_list, density_list,
-          basis_list, sym_list, np.arange(n_jobs),[atoms.get_positions()]*n_jobs,
+          basis_list, sym_list, list(range(n_jobs)),[all_pos]*n_jobs,
           [orient_mode]*n_jobs)
+
     return elfs
 
 def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
@@ -274,6 +277,8 @@ def orient_elf(i, elf, all_pos, mode = 'elf'):
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
                 'nn': Use nearest neighbor algorithm}
     """
+
+
     oriented_elfs = []
     if mode == 'elf':
         angles_getter = get_elfcs_angles
@@ -285,7 +290,8 @@ def orient_elf(i, elf, all_pos, mode = 'elf'):
 
     angles = angles_getter(i, fold_back_coords(i, all_pos, elf.unitcell), elf.value)
     oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
-    return(ElF(oriented, angles, elf.basis, elf.species, elf.unitcell))
+    elf_oriented = ElF(oriented, angles, elf.basis, elf.species, elf.unitcell)
+    return elf_oriented
 
 def orient_elfs(elfs, atoms, mode = 'elf'):
     """
