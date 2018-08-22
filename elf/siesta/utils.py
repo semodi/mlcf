@@ -147,11 +147,11 @@ def get_atoms(path):
             alltext = p.findall(infile.read())
             lattice_vec = np.array(alltext[0].split()[2:-2]).reshape(-1,3).astype(float)
             infile.seek(0)
-            p = re.compile("LatticeConstant\s*\d*",
+            p = re.compile("LatticeConstant\s*\d*\.\d*",
                            re.DOTALL)
             alltext = p.findall(infile.read())
             a = alltext[0]
-            a = np.array(re.compile("\d+").findall(a)[0]).astype(float)
+            a = np.array(re.compile("\d+\.\d+").findall(a)[0]).astype(float)
             return lattice_vec * a
 
     chem_species_array = find_chem_species(path)
