@@ -23,9 +23,8 @@ def get_view(profile = 'default'):
     return view
 
 def __get_elfs(path, atoms, basis, method):
-    view = get_view()
     density = elf.siesta.get_density(path)
-    return elf.real_space.get_elfs_oriented(atoms, density, basis, method, view)
+    return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
 
 def atoi(text):
     return int(text) if text.isdigit() else text

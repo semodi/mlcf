@@ -1,3 +1,5 @@
+""" Module that provides algebraic operations on SO(3) tensors
+"""
 import numpy as np
 import spherical_functions as sf
 from sympy.physics.wigner import wigner_3j
@@ -6,6 +8,7 @@ from sympy import N
 # Transformation matrix between radial and euclidean (real) representation of
 # a rank-1 tensor
 T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
+ANGLE_THRESHOLD = 1e-3
 
 def get_max(tensor):
     """
@@ -35,25 +38,6 @@ def make_real(tensor):
             tensor_real.append(tensor['{},{},{}'.format(n,l,0)].real)
             for m in range(1,l+1):
                 tensor_real.append((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,-m)]+(-1)**m*tensor['{},{},{}'.format(n,l,m)])).real)
-
-    return np.array(tensor_real)
-
-def make_real_old(tensor):
-    """
-    Take complex tensors tensor provided as a dict and convert them into
-    real tensors (old version as used by xcml)
-    """
-    tensor_real = []
-    n_max, l_max = get_max(tensor)
-    for n in range(n_max):
-        for l in range(l_max):
-            for m in range(-l,0):
-                tensor_real.append((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
-                tensor_real.append((1j/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]-(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).real)
-#                assert np.allclose((-1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+(-1)**m*tensor['{},{},{}'.format(n,l,-m)])).imag,0)
-
-            tensor_real.append(tensor['{},{},{}'.format(n,l,0)].real)
-#            assert np.allclose(tensor['{},{},{}'.format(n,l,0)].imag, 0)
 
     return np.array(tensor_real)
 
@@ -107,7 +91,6 @@ def rotate_vector(vec, angles, inverse = False):
     """ Rotate a real vector (euclidean order: xyz) with euler angles
         inverse = False: rotate vector
         inverse = True: rotate CS"""
-
 
     vec = vec[:,[1,2,0]]
     T_inv = np.conj(T.T)
@@ -177,7 +160,13 @@ def rotate_tensor(tensor, angles, inverse = False):
     return tensor_rotated
 
 
-def get_P(tensor, wig3j = None):
+def tensor_to_P(tensor, wig3j = None):
+    """
+    Transform an arbitray SO(3) tensor into real P which transforms under the irreducible
+    representation with l = 1. Wigner-3j symbols can be provided or calculated on
+    the fly for faster evaluation. If providedn, wig3j should be an array
+    with indexing [l1,l2,m,m1,m2]
+    """
     P = []
     n_rad, n_l = get_max(tensor)
 
@@ -209,26 +198,20 @@ def get_P(tensor, wig3j = None):
                                   (-1)**m * wig
                         p *= (-1)**(lam-l2)
                         P[mu+lam].append(p)
-    return P
 
-def tensor_to_P(tensor):
-    """
-    Transform an arbitray SO(3) tensor into P which transforms under the irreducible
-    representation with l = 1
-    """
-    p = np.array(get_P(tensor))
     p_real = []
-    for pi in np.array(p).T:
+    for pi in np.array(P).T:
         p_real.append((T.dot(pi))[[2,0,1]])
-    p = np.array(p_real).T
-    if not np.allclose(p.imag,np.zeros_like(p)):
+    P = np.array(p_real).T
+    if not np.allclose(P.imag,np.zeros_like(P)):
         raise Exception('Ooops, something went wrong. P not purely real.')
-    return p.real.T
+    return P.real.T
 
 def get_elfcs_angles(i, coords, tensor):
     """Use the ElF algorithm to get angles relating global to local CS
     """
 
+    # Collect all p-orbitals as vectors
     n_max, l_max = get_max(tensor)
     if l_max > 1:
         p = []
@@ -240,25 +223,33 @@ def get_elfcs_angles(i, coords, tensor):
         p = np.array(p)
 
     norm = np.linalg.norm
-    # p = tensor_to_P(tensor)
+
+    # In case p-orbitals are not enough, calculate more l=1 tensors
+    # by combining different angular momenta
     p_extended = tensor_to_P(tensor)
     p = np.concatenate([p, p_extended], axis = 0).astype(float)
 
-    axis1 = p[0]/norm(p[0]) #TODO: Check for size, skip if not large enough
-    for u, d in enumerate(p[1:]):
-        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > 1e-3:
-            axis2 = d
-            # print('{},{}'.format(i,u))
+    k = 0
+    for k, d in enumerate(p):
+        if norm(d) > 1e-5:
+            axis1 = p[k]/norm(p[k])
             break
+    for u, d in enumerate(p[k:]):
+        # Find another p-orbital (or l=1 tensor) that is not collinear
+        # with the first axis
+        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > ANGLE_THRESHOLD:
+            axis2 = d
+            break
+    # If everything fails, pick the direction to the nearest atom as
+    # the second axis
     else:
-        # print('{}, Using coordinates for alignment'.format(i))
         c = np.array(coords[i])
         coords = np.delete(coords, i, axis = 0)
         dr = norm((coords - c), axis =1)
         order = np.argsort(dr)
         for o in order:
             axis2 = coords[o] - c
-            if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-3:
+            if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > ANGLE_THRESHOLD:
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')
@@ -268,6 +259,8 @@ def get_elfcs_angles(i, coords, tensor):
     axis2 = np.cross(axis3, axis1)
     axis2 = axis2/norm(axis2)
 
+    # Round to avoid problems in arccos of get_euler_angles()
+    # 10 digits should be more than enough accuracy given other 'error' sources
     axis1 = axis1.round(10)
     axis2 = axis2.round(10)
     axis3 = axis3.round(10)
@@ -287,14 +280,15 @@ def get_nncs_angles(i, coords, tensor = None):
     order = np.argsort(np.linalg.norm(coords_sorted - c, axis = 1))
     coords_sorted = coords_sorted[order]
 
+    # Direction to nearest atom determines first axis
     axis1 = coords_sorted[0] - c
     axis1 = axis1/norm(axis1)
 
+    # Second axis determined by direction to next nearest atom
+    # If collinear with axis1 proceed to next nearest atom
     for u, cs in enumerate(coords_sorted[1:]):
         axis2 = cs - c
-        if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > 1e-3:
-            # print(order)
-            # print("i = {}, Using {}".format(i, order[u+1]))
+        if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > ANGLE_THRESHOLD:
             break
     else:
         raise Exception('Could not determine orientation. Aborting...')
@@ -304,6 +298,7 @@ def get_nncs_angles(i, coords, tensor = None):
     axis2 = np.cross(axis3, axis1)
     axis2 /= norm(axis2)
 
+    # Round to avoid problems in arccos of get_euler_angles()
     axis1 = axis1.round(10)
     axis2 = axis2.round(10)
     axis3 = axis3.round(10)
@@ -312,10 +307,23 @@ def get_nncs_angles(i, coords, tensor = None):
 
     return angles
 
+#TODO: Find faster implementation than recursion, non-ortho implementation
 def fold_back_coords(i, coords, unitcell):
-    if not np.allclose(unitcell, np.eye(3)*unitcell[0,0]):
-        raise Exception('fold_back_coords not implemented for non_cubic unitcells')
+    """ Return the periodic images of coords in a unit-cell "unitcell"
+        that are closest to coords[i]"""
+
+    if not np.allclose(unitcell.astype(bool), np.eye(3).astype(bool)):
+        raise Exception('fold_back_coords not implemented for non orthorhombic unitcells')
+    else:
+        uc = np.diag(unitcell)
     coords = np.array(coords.reshape(-1,3))
     rel_c = coords - coords[i:i+1]
-    coords += -np.sign(rel_c)*unitcell[0,0]*(np.sign(np.abs(rel_c) - unitcell[0,0]*.5)+1)*.5
-    return coords
+    for u in range(3):
+        coords[:,u] -= np.sign(rel_c[:,u])*uc[u]*\
+        (np.sign(np.abs(rel_c[:,u]) - uc[u]*.5)+1)*.5
+
+    rel_c = coords - coords[i:i+1]
+    if np.all(np.abs(rel_c) < (uc/2).reshape(1,3)):
+        return coords
+    else:
+        return fold_back_coords(i, coords, unitcell)

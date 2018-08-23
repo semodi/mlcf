@@ -104,6 +104,8 @@ def get_energy(path, keywords=['Total']):
     return values
 
 def get_forces(path):
+    """find forces in siesta .out file
+    """
     with open(path, 'r') as infile:
         infile.seek(0)
 
@@ -121,6 +123,8 @@ def get_forces(path):
 
 
 def get_atoms(path):
+    """find atomic data in siesta .out file and return as ase Atoms object
+    """
     def find_coords(path):
         with open(path, 'r') as infile:
             infile.seek(0)

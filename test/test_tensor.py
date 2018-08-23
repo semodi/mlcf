@@ -3,8 +3,8 @@ import unittest
 import os
 import pickle
 import elf.siesta as siesta
-from elf.geom import make_real, make_real_old, rotate_tensor, get_nncs_angles,\
- get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector
+from elf.geom import make_real, rotate_tensor, get_nncs_angles,\
+ get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector, fold_back_coords
 from elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
 import numpy as np
@@ -21,6 +21,8 @@ for i, e in enumerate(elf):
 elf = elf_list
 
 def test_rotate_tensor():
+    """Test certain algebraic properties of the rotate_tensor() routine
+    """
     # Test identity and inverse
     id = rotate_tensor(elf[0], [0,0,0])
     rotated = rotate_tensor(elf[0], [1.2,0.3,0.1])
@@ -37,62 +39,33 @@ def test_rotate_tensor():
         for key in casimir:
             assert np.allclose(casimir[key],casimir_rotated[key])
 
-def test_nncs():
-    # Test the NNCS alignment (nearest-neighbor rule)
-    for i in [1,4,0]:
+def test_rotate_vector():
+    """Test certain algebraic properties of the rotate_vector() routine
+    """
+    vec = np.array([[1.3, 0.2, 2.1],[0,1,2],[0,0,0],[1000.123,10.222234,11]])
+    ang = [0.15, 2.98, 5.16]
+    # Test identity and inverse
+    assert np.allclose(rotate_vector(vec,[0,0,0]),vec)
+    assert np.allclose(rotate_vector(rotate_vector(vec,ang),ang,True),vec)
 
-        angles1 = get_nncs_angles(i, atoms.get_positions())
-        rotated1 = rotate_tensor(elf[i], angles1, inverse = True)
+    assert np.allclose(np.linalg.norm(vec, axis=-1),
+                       np.linalg.norm(rotate_vector(vec,ang), axis=-1))
 
-        for it in range(5):
-            rand_ang = np.random.rand(3)
-            elf_rotated = rotate_tensor(elf[i],rand_ang)
-            coords_rotated = rotate_vector(atoms.get_positions()-\
-                atoms.get_positions()[i], rand_ang)
+def test_fold_back_coords():
 
-            angles2 = get_nncs_angles(i, coords_rotated)
-            rotated2 = rotate_tensor(elf_rotated, angles2, inverse = True)
+    coords = np.array([[1,0,1],[19,18,-20]]).astype(float)
+    uc = (np.eye(3)*20).astype(float)
 
-            for key in rotated1:
-                np.allclose(rotated1[key], rotated2[key], atol= 1e-6)
-    # pickle.dump(rotated1, open('./test/elf_nncs.dat','wb'))
-    elf_ref = pickle.load(open('./test/elf_nncs.dat','rb'))
-    for key in elf[0]:
-        assert np.allclose(rotated1[key], elf_ref[key])
+    coords_folded = np.array([[1,0,1],[-1,-2,0]]).astype(float)
+    assert np.allclose(coords_folded,fold_back_coords(0,coords,uc))
 
-def test_elfcs():
+    uc2 = np.eye(3)
+    uc2[0,0] = 6
+    uc2[1,1] = 10
+    uc2[2,2] = 2.5
 
-    # Test the ElF alignment (ElF rule)
-    for i in [0,1,4,0]:
-        print(i)
-        angles1 = get_elfcs_angles(i, atoms.get_positions(), elf[i])
-        rotated1 = rotate_tensor(elf[i], angles1, inverse = True)
-
-        for it in range(5):
-            rand_ang = np.random.rand(3)
-            elf_rotated = rotate_tensor(elf[i],rand_ang)
-            coords_rotated = rotate_vector(atoms.get_positions()-\
-                atoms.get_positions()[i], rand_ang)
-
-            angles2 = get_elfcs_angles(i, coords_rotated, elf_rotated)
-            rotated2 = rotate_tensor(elf_rotated, angles2, inverse = True)
-
-            for key in rotated1:
-                np.allclose(rotated1[key], rotated2[key], atol= 1e-6)
-
-    # pickle.dump(rotated1, open('./test/elf_elfcs.dat','wb'))
-    elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
-    for key in elf[0]:
-        assert np.allclose(rotated1[key], elf_ref[key])
-
-def test_orient_elfs():
-    print(atoms.get_positions())
-    oriented = orient_elfs(elf_obj, atoms)[0].value
-    elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
-    assert np.allclose(make_real(elf_ref), oriented)
+    coords_folded_2 = np.array([[1,0,1],[1,-2,0]]).astype(float)
+    assert np.allclose(coords_folded_2,fold_back_coords(0,coords,uc2))
 
 if __name__ == '__main__':
-    print('\n\n=======NNCS======\n\n')
-    test_nncs()
-    print('\n\n=======ElFCS======\n\n')
-    test_elfcs()
+    pass

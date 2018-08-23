@@ -58,7 +58,7 @@ def box_around(pos, radius, density, unit = 'A'):
 
 def g(r, r_i, r_c, a, gamma):
     """
-    Non-orthogonalized radial spherical_functions
+    Non-orthogonalized radial functions
     """
     def g_(r, r_i, r_c, a):
         return (r-r_i)**(2)*(r_c-r)**(a+2)*np.exp(-gamma*(r/r_c)**(1/4))
@@ -138,6 +138,7 @@ def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
         for m in range(-l,l+1):
             # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
             angs[l].append(sph_harm(m, l, Phi, Theta))
+
     #Build radial part of b.f.
     W = get_W(r_i, r_o, n_rad, gamma) # Matrix to orthogonalize radial basis
     rads = radials(R, r_i, r_o, W, gamma)
@@ -185,8 +186,8 @@ def atomic_elf(pos, density, basis, chem_symbol):
         U[i,:] = U[i,:] / density.grid[i]
     V_cell = np.linalg.det(U)
 
-    # TODO:
-    # The following two lines are needed to obtain the dataset from the old implementation
+    # The following two lines are needed to
+    #obtain the dataset from the old implementation
     V_cell /= (37.7945/216)**3*Bohr**3
     V_cell *= np.sqrt(Bohr)
 
@@ -203,9 +204,13 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
 def get_elf_oriented_thread(pos, density, basis, chem_symbol,
     i, all_positions, mode = 'elf'):
+    """ Method that should be used in a parallel executions.
+    One thread/process computes and orients the ElF for a single atom
+    inside a system
+    """
     e = ElF(atomic_elf(pos, density, basis, chem_symbol),[0,0,0],basis,
         chem_symbol,density.unitcell)
-    elf_oriented = orient_elf(i,e,all_positions,mode) 
+    elf_oriented = orient_elf(i,e,all_positions,mode)
 
     return(elf_oriented)
 
@@ -222,11 +227,14 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
                 (see density.py)
     basis: dict; specifies the basis set used for the ELF decomposition
                         for each chem. element
-    chem_symbol: str; chemical symbol
 
+    view: ipyparallel balanced view for parallel execution through sync map
+    orient_mode = {'none': do not orient and return complex tensor,
+                   'elf'/'nn': orient using the elf or nn algorithm and return
+                   real tensor}
     Returns:
     --------
-    list; list containing the complex atomic ELFs as dictionaries'''
+    list; list containing the complex/real atomic ELFs '''
 
     density_list = []
     pos_list = []
@@ -264,6 +272,8 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
 
 def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
     """
+    Outdated, use get_elfs() with "mode='elf'/'nn'" instead.
+
     Like get_elfs, but returns real, oriented elfs
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
@@ -272,13 +282,18 @@ def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view())
 
 def orient_elf(i, elf, all_pos, mode = 'elf'):
     """
-    Takes a list of electric fingerprints and orients them according
+    Takes an ElF and orient it according
     to the rule specified in mode.
+
+    Parameters:
+    -----------
+    i: int; Index of the atom in all_pos
+    elf: ElF; ElF to orient
+    all_pos: numpy.ndarray; positions of all atoms in system (including the
+    one with index i)
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
                 'nn': Use nearest neighbor algorithm}
     """
-
-
     oriented_elfs = []
     if mode == 'elf':
         angles_getter = get_elfcs_angles
@@ -287,18 +302,14 @@ def orient_elf(i, elf, all_pos, mode = 'elf'):
     else:
         raise Exception('Unkown mode: {}'.format(mode))
 
-
     angles = angles_getter(i, fold_back_coords(i, all_pos, elf.unitcell), elf.value)
     oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
     elf_oriented = ElF(oriented, angles, elf.basis, elf.species, elf.unitcell)
     return elf_oriented
 
 def orient_elfs(elfs, atoms, mode = 'elf'):
-    """
-    Takes a list of electric fingerprints and orients them according
-    to the rule specified in mode.
-    mode = {'elf': Use the ElF algorithm to orient fingerprint,
-                'nn': Use nearest neighbor algorithm}
+    """Convenience function that applies orient_elf to a list of elfs.
+       (Exists for compatibility reasons)
     """
 
     oriented_elfs = []
