@@ -8,6 +8,7 @@ import os
 from elf import ElF
 import ipyparallel as ipp
 import re
+import pandas as pd 
 
 class serial_view():
     def __init__(self):
@@ -58,9 +59,16 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
      atoms, [basis]*len(atoms), [method]*len(atoms))
 
+    forces = view.map_sync(elf.siesta.get_forces, [p + '.' + add_ext for p in paths])
+    energies = view.map_sync(elf.siesta.get_energy, [p + '.' + add_ext for p in paths])
+    forces = np.array(forces).reshape(-1,3)
+    energies = np.array(energies).flatten()
+
     name = root.split('/')[-1]
     elfs_to_hdf5(elfs, name + '_processed.hdf5')
     write(name +'.traj', atoms)
+    pd.DataFrame(forces).to_csv(name + '.forces', index = None, header = None)
+    pd.DataFrame(energies).to_csv(name + '.energies', index = None, header = None)
     return elfs
 
 def elfs_to_hdf5(elfs, path):
