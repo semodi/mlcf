@@ -8,7 +8,7 @@ from sympy import N
 # Transformation matrix between radial and euclidean (real) representation of
 # a rank-1 tensor
 T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
-ANGLE_THRESHOLD = 1e-3
+ANGLE_THRESHOLD = 1e-5
 
 def get_max(tensor):
     """
