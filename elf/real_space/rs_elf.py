@@ -203,7 +203,7 @@ def atomic_elf(pos, density, basis, chem_symbol):
     return coeff
 
 def get_elf_oriented_thread(pos, density, basis, chem_symbol,
-    i, all_positions, mode = 'elf'):
+    i, all_positions, mode):
     """ Method that should be used in a parallel executions.
     One thread/process computes and orients the ElF for a single atom
     inside a system
@@ -270,7 +270,7 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
 
     return elfs
 
-def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view()):
+def get_elfs_oriented(atoms, density, basis, mode, view = serial_view()):
     """
     Outdated, use get_elfs() with "mode='elf'/'nn'" instead.
 
@@ -280,7 +280,7 @@ def get_elfs_oriented(atoms, density, basis, mode = 'elf', view = serial_view())
     """
     return get_elfs(atoms, density, basis, view, orient_mode = mode)
 
-def orient_elf(i, elf, all_pos, mode = 'elf'):
+def orient_elf(i, elf, all_pos, mode):
     """
     Takes an ElF and orient it according
     to the rule specified in mode.
@@ -307,7 +307,7 @@ def orient_elf(i, elf, all_pos, mode = 'elf'):
     elf_oriented = ElF(oriented, angles, elf.basis, elf.species, elf.unitcell)
     return elf_oriented
 
-def orient_elfs(elfs, atoms, mode = 'elf'):
+def orient_elfs(elfs, atoms, mode):
     """Convenience function that applies orient_elf to a list of elfs.
        (Exists for compatibility reasons)
     """
