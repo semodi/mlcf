@@ -30,8 +30,8 @@ def waterc_to_tip4p(coords):
     assert np.allclose(norm(axis2, axis = -1), np.zeros(len(axis2)) + 1)
     
     
-    h2 = np.cos(ang/2)*bisec + np.sin(ang/2)*axis2
-    h1 = np.cos(ang/2)*bisec - np.sin(ang/2)*axis2
+    h2 = np.cos(ang/2)*bisec + np.sin(ang/2)*axis2 + coords[:,0]
+    h1 = np.cos(ang/2)*bisec - np.sin(ang/2)*axis2 + coords[:,0]
     h1 = np.concatenate([h1,np.zeros(len(h1)).reshape(-1,1) + qh], axis = -1)
     h2 = np.concatenate([h2,np.zeros(len(h1)).reshape(-1,1) + qh], axis = -1)
     m = np.concatenate([m,np.zeros(len(m)).reshape(-1,1) + qm], axis = -1)
@@ -75,4 +75,4 @@ def sample_dimers(coords, roo, epsilon = 0.1):
             break
     where = np.where(check)[1][0]
     print(np.linalg.norm((coords[seed] - coords[ind[0,where]])))
-    return seed, where
+    return seed, ind[0,where]
