@@ -8,8 +8,8 @@ from sympy import N
 # Transformation matrix between radial and euclidean (real) representation of
 # a rank-1 tensor
 T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
-ANGLE_THRESHOLD = 1e-5
-
+ANGLE_THRESHOLD = 1e-3
+NORM_THRESHOLD = 1e-3
 def get_max(tensor):
     """
     Get the maximum radial index and maximum ang. momentum in tensor
@@ -190,6 +190,7 @@ def tensor_to_P(tensor, wig3j = None):
                 for l1 in range(n_l):
                     for l2 in range(n_l):
                         if (l1 + l2)%2 == 0: continue
+                        # if not l1 == l2: continue
                         p = 0
                         for m in range(-n_l, n_l+1):
                             wig = wig3j[l2,l1,mu,(m-mu),-m]
@@ -201,6 +202,7 @@ def tensor_to_P(tensor, wig3j = None):
 
     p_real = []
     for pi in np.array(P).T:
+        # pi *= np.array([-1,-1j,1])
         p_real.append((T.dot(pi))[[2,0,1]])
     P = np.array(p_real).T
     if not np.allclose(P.imag,np.zeros_like(P)):
@@ -223,21 +225,24 @@ def get_elfcs_angles(i, coords, tensor):
         p = np.array(p)
 
     norm = np.linalg.norm
-
+    len_normal = len(p)
     # In case p-orbitals are not enough, calculate more l=1 tensors
     # by combining different angular momenta
     p_extended = tensor_to_P(tensor)
     p = np.concatenate([p, p_extended], axis = 0).astype(float)
-
+    # p = p_extended
     k = 0
     for k, d in enumerate(p):
-        if norm(d) > 1e-5:
+        if norm(d) > NORM_THRESHOLD:
+            # print('Axis1 with elf')
             axis1 = p[k]/norm(p[k])
             break
     for u, d in enumerate(p[k:]):
         # Find another p-orbital (or l=1 tensor) that is not collinear
         # with the first axis
-        if 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > ANGLE_THRESHOLD:
+        if norm(d) > NORM_THRESHOLD and 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > ANGLE_THRESHOLD:
+            # print('Axis2 with elf, {}, {}: {}'.format(['normal', 'extended'][int(k + u >= len_normal)],
+                    # k+u, norm(d)))
             axis2 = d
             break
     # If everything fails, pick the direction to the nearest atom as
@@ -250,6 +255,7 @@ def get_elfcs_angles(i, coords, tensor):
         for o in order:
             axis2 = coords[o] - c
             if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > ANGLE_THRESHOLD:
+                # print('Axis2 with nn')
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')
@@ -258,7 +264,6 @@ def get_elfcs_angles(i, coords, tensor):
     axis3 = axis3/norm(axis3)
     axis2 = np.cross(axis3, axis1)
     axis2 = axis2/norm(axis2)
-
     # Round to avoid problems in arccos of get_euler_angles()
     # 10 digits should be more than enough accuracy given other 'error' sources
     axis1 = axis1.round(10)
