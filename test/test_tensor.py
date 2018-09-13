@@ -52,7 +52,10 @@ def test_rotate_vector():
                        np.linalg.norm(rotate_vector(vec,ang), axis=-1))
 
 def test_fold_back_coords():
-
+    """ Test whether the routine fold_back_coords correctly folds the
+    coordinates into the unitcell so that the distance between two points is
+    minimized
+    """
     coords = np.array([[1,0,1],[19,18,-20]]).astype(float)
     uc = (np.eye(3)*20).astype(float)
 
@@ -66,6 +69,27 @@ def test_fold_back_coords():
 
     coords_folded_2 = np.array([[1,0,1],[1,-2,0]]).astype(float)
     assert np.allclose(coords_folded_2,fold_back_coords(0,coords,uc2))
+
+def test_p_cov():
+    """ Test whether p transforms covariantly under SO(3) rotations
+    """
+    for i in [3,1,2,4,0]:
+
+        p_init = tensor_to_P(elf[i])
+
+        for it in range(10):
+            rand_ang = np.random.rand(3)*2*np.pi
+            elf_rotated = rotate_tensor(elf[i],rand_ang)
+            p_rotated = tensor_to_P(elf_rotated)
+            p = rotate_vector(p_rotated, rand_ang, inverse = True)
+            assert np.allclose(p, p_init)
+
+        for it in range(10):
+            rand_ang = np.random.rand(3)*2*np.pi
+            elf_rotated = rotate_tensor(elf[i],rand_ang)
+            p_rotated = tensor_to_P(elf_rotated)
+            p = rotate_vector(p_init, rand_ang)
+            assert np.allclose(p, p_rotated)
 
 if __name__ == '__main__':
     pass

@@ -29,34 +29,16 @@ def test_rs_elf():
     for key in elf:
         assert np.allclose(elf[key], elf_ref[key])
 
-def test_rot_invariance_elfcs():
-    """Test if the ElF algorithm is rotationally invariant, by calculating oriented
-    elfs for monomers that are rotated copies of each other
-    """
-    elfs = preprocess_all('./test/monomers_rotated', basis)
-    elfs = np.array([e[0].value for e in elfs])
-    assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
-    assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
-
-def test_rot_invariance_nncs():
-    """Test if the nearest-neighbor algorithm is rotationally invariant, by calculating
-    oriented elfs for monomers that are rotated copies of each other
-    """
-    elfs = preprocess_all('./test/monomers_rotated', basis, method = 'nn')
-    elfs = np.array([e[0].value for e in elfs])
-    assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
-    assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
-
 def test_nncs():
     """ Test whether nearest neighbor reproduces the reference values for elf
     """
-    for i in [1,4,0]:
+    for i in [3,1,4,0]:
 
         angles1 = get_nncs_angles(i, atoms.get_positions())
         rotated1 = rotate_tensor(elf[i], angles1, inverse = True)
 
         for it in range(5):
-            rand_ang = np.random.rand(3)
+            rand_ang = np.random.rand(3)*2*np.pi
             elf_rotated = rotate_tensor(elf[i],rand_ang)
             coords_rotated = rotate_vector(atoms.get_positions()-\
                 atoms.get_positions()[i], rand_ang)
@@ -75,13 +57,15 @@ def test_elfcs():
     """ Test whether the ElF algorithm reproduces the reference values for elf
     """
     # Test the ElF alignment (ElF rule)
-    for i in [0,1,4,0]:
+    for i in [0,3]:
+        print('======Testing {} =========='.format(i))
         angles1 = get_elfcs_angles(i, atoms.get_positions(), elf[i])
+        print(angles1)
         rotated1 = rotate_tensor(elf[i], angles1, inverse = True)
 
-        for it in range(5):
-            rand_ang = np.random.rand(3)
-            elf_rotated = rotate_tensor(elf[i],rand_ang)
+        for it in range(10):
+            rand_ang = np.random.rand(3)*2*np.pi
+            elf_rotated = rotate_tensor(elf[i], rand_ang)
             coords_rotated = rotate_vector(atoms.get_positions()-\
                 atoms.get_positions()[i], rand_ang)
 
@@ -89,18 +73,19 @@ def test_elfcs():
             rotated2 = rotate_tensor(elf_rotated, angles2, inverse = True)
 
             for key in rotated1:
-                np.allclose(rotated1[key], rotated2[key], atol= 1e-6)
+                assert np.allclose(rotated1[key], rotated2[key], atol= 1e-3, rtol = 1e-3)
 
     # pickle.dump(rotated1, open('./test/elf_elfcs.dat','wb'))
-    elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
-    for key in elf[0]:
-        assert np.allclose(rotated1[key], elf_ref[key])
+    # elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
+    # for key in elf[0]:
+        # assert np.allclose(rotated1[key], elf_ref[key])
 
 def test_orient_elfs():
     """ Test the method orient_elfs()
     """
-    oriented = orient_elfs(elf_obj, atoms)[0].value
+    oriented = orient_elfs(elf_obj, atoms, mode='elf')[0].value
     elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
     assert np.allclose(make_real(elf_ref), oriented)
+
 if __name__ == '__main__':
-    pass
+    test_elfcs()

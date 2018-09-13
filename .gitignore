@@ -110,3 +110,6 @@ basis/
 data/
 models/
 monomers_rotated*
+*.pdf
+*.eps
+*.csv
