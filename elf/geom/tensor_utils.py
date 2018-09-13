@@ -8,7 +8,7 @@ from sympy import N
 # Transformation matrix between radial and euclidean (real) representation of
 # a rank-1 tensor
 T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
-ANGLE_THRESHOLD = 1e-3
+ANGLE_THRESHOLD = 1e-5
 NORM_THRESHOLD = 1e-3
 def get_max(tensor):
     """
@@ -103,7 +103,7 @@ def rotate_vector(vec, angles, inverse = False):
     # D = D.conj()
 
     R = T.dot(D.dot(T_inv))
-    assert np.allclose(R.conj(), R)
+    # assert np.allclose(R.conj(), R)
 
     vec= np.einsum('ij,kj -> ki', R, vec)
 
@@ -190,7 +190,6 @@ def tensor_to_P(tensor, wig3j = None):
                 for l1 in range(n_l):
                     for l2 in range(n_l):
                         if (l1 + l2)%2 == 0: continue
-                        # if not l1 == l2: continue
                         p = 0
                         for m in range(-n_l, n_l+1):
                             wig = wig3j[l2,l1,mu,(m-mu),-m]
@@ -202,7 +201,6 @@ def tensor_to_P(tensor, wig3j = None):
 
     p_real = []
     for pi in np.array(P).T:
-        # pi *= np.array([-1,-1j,1])
         p_real.append((T.dot(pi))[[2,0,1]])
     P = np.array(p_real).T
     if not np.allclose(P.imag,np.zeros_like(P)):
