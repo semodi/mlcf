@@ -5,7 +5,7 @@ from ase.io import read, write
 #tip4p/2005 parameters
 r_oh = 0.9572
 ang = 104.52 * np.pi/180
-qh = 0.5564
+qh = -0.5564
 qm = -2*qh
 r_om = 0.1546
 
@@ -42,12 +42,13 @@ def tip4p_to_str(arr):
     siesta_str = '%block Geometry.Charge \n'
     
     # M 
-    
-    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,0,3], len(arr)) 
+    n_mol = len(arr) 
+    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,0,3]*n_mol, n_mol) 
     for c in arr[:,0,:3]:
         siesta_str += ' {:5.4f} {:5.4f} {:5.4f} Ang \n'.format(*c)
-        
-    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,1,3], 2*len(arr)) 
+    
+    # H    
+    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,1,3]*2*n_mol, 2*n_mol) 
     for c in arr[:,1:,:3].reshape(-1,3):
         siesta_str += ' {:5.4f} {:5.4f} {:5.4f} Ang \n'.format(*c)
         

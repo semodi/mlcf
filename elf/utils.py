@@ -24,7 +24,7 @@ def get_view(profile = 'default'):
     return view
 
 def __get_elfs(path, atoms, basis, method):
-    density = elf.siesta.get_density(path)
+    density = elf.siesta.get_density_bin(path)
     return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
 
 def atoi(text):
