@@ -1,0 +1,691 @@
+""" Module that implements Network, a class that combines several subnets
+to build a master neural network that can be trained on datasets.
+"""
+
+import numpy as np
+import tensorflow as tf
+import pandas as pd
+import os
+import sys
+from sklearn.model_selection import train_test_split
+from .ml_util import *
+try:
+    from .preprocessing import *
+except ImportError:
+    print('Preprocessing module not loaded')
+from matplotlib import pyplot as plt
+import math
+import pickle
+from collections import namedtuple
+Dataset = namedtuple("Dataset", "data species species_index n")
+
+
+class Network():
+
+    def __init__(self, subnets):
+
+        if not isinstance(subnets, list):
+            self.subnets = [subnets]
+        else:
+            self.subnets = subnets
+
+        self.model_loaded = False
+        self.rand_state = np.random.get_state()
+        self.graph = None
+        self.target_mean = 0
+        self.target_std = 1
+        self.sess = None
+        self.graph = None
+        self.initialized = False
+        self.optimizer = None
+        self.checkpoint_path = None
+
+    # ========= Network operations ============ #
+
+    def __add__(self, other):
+        if isinstance(other, Subnet):
+            if not len(self.subnets) == 1:
+                raise Exception(" + operator only valid if only one training set contained")
+            else:
+                self.subnets[0] += [other]
+        else:
+            raise Exception("Datatypes not compatible")
+
+        return self
+
+    def __mod__(self, other):
+        if isinstance(other, Subnet):
+            self.subnets += [[other]]
+        elif isinstance(other, Network):
+            self.subnets += other.subnets
+        else:
+            raise Exception("Datatypes not compatible")
+
+        return self
+
+    def reset(self):
+        self.sess = None
+        self.graph = None
+        self.initialized = False
+        self.optimizer = None
+        self.checkpoint_path = None
+
+    def construct_network(self):
+        """ Builds the tensorflow graph from subnets
+        """
+
+        cnt = 0
+        logits = []
+        for subnet in self.subnets:
+            if isinstance(subnet,list):
+                sublist = []
+                for s in subnet:
+                    sublist.append(s.get_logits(cnt)[0])
+                    cnt += 1
+                logits.append(sublist)
+            else:
+                logits.append(subnet.get_logits(cnt)[0])
+                cnt += 1
+
+        return logits
+
+    def get_feed(self, which = 'train', train_valid_split = 0.8, seed = 42):
+        """ Return a dictionary that can be used as a feed_dict in tensorflow
+
+        Parameters:
+        -----------
+        which: {'train',test'}, which part of the dataset is used
+        train_valid_split: float; ratio of train and validation set size
+        seed: int; seed parameter for the random shuffle algorithm, make
+
+        Returns:
+        --------
+        (dictionary, dictionary): either (training feed dictionary, validation feed dict.)
+                                or (testing feed dictionary, None)
+        """
+        train_feed_dict = {}
+        valid_feed_dict = {}
+        test_feed_dict = {}
+
+        for subnet in self.subnets:
+            if isinstance(subnet,list):
+                for s in subnet:
+                    train_feed_dict.update(s.get_feed('train', train_valid_split, seed))
+                    valid_feed_dict.update(s.get_feed('valid', train_valid_split, seed))
+                    test_feed_dict.update(s.get_feed('test', train_valid_split, seed))
+            else:
+                train_feed_dict.update(subnet.get_feed('train', train_valid_split, seed))
+                valid_feed_dict.update(subnet.get_feed('valid', train_valid_split, seed))
+                test_feed_dict.update(subnet.get_feed('test', seed = seed))
+
+        if which == 'train':
+            return train_feed_dict, valid_feed_dict
+        elif which == 'test':
+            return test_feed_dict, None
+
+
+    def get_cost(self):
+        """ Build the tensorflow node that defines the cost function
+
+        Returns
+        -------
+        cost_list: [tensorflow.placeholder]; list of costs for subnets. subnets
+            whose outputs are added together share cost functions
+        """
+        cost_list = []
+
+        for subnet in self.subnets:
+            if isinstance(subnet,list):
+                cost = 0
+                y_ = self.graph.get_tensor_by_name(subnet[0].y_name)
+                log = 0
+                for s in subnet:
+                    log += self.graph.get_tensor_by_name(s.logits_name)
+                cost += tf.reduce_mean(tf.reduce_mean(tf.square(y_-log),0))
+            else:
+                log = self.graph.get_tensor_by_name(subnet.logits_name)
+                y_ = self.graph.get_tensor_by_name(subnet.y_name)
+                cost = tf.reduce_mean(tf.reduce_mean(tf.square(y_-log),0))
+            cost_list.append(cost)
+
+        return cost_list
+
+
+
+
+    def train(self,
+              step_size=0.01,
+              max_steps=50001,
+              b_=0,
+              verbose=True,
+              optimizer=None,
+              adaptive_rate=False,
+              multiplier = 1.0):
+
+        """ Train the master neural network
+
+        Parameters:
+        ----------
+        step_size: float; step size for gradient descent
+        max_steps: int; number of training epochs
+        b: float; regularization parameter
+        verbose: boolean; print cost for intermediate training epochs
+        optimizer: {tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...}
+        adaptive_rate: boolean; wether to adjust step_size if cost increases
+                        not recommended for AdamOptimizer
+
+        Returns:
+        --------
+        None
+        """
+
+
+        self.model_loaded = True
+        if self.graph is None:
+            self.graph = tf.Graph()
+            build_graph = True
+        else:
+            build_graph = False
+
+        with self.graph.as_default():
+
+            if self.sess == None:
+                sess = tf.Session()
+                self.sess = sess
+            else:
+                sess = self.sess
+
+
+
+            # Get number of distinct subnet species
+            species = {}
+            for net in self.subnets:
+                if isinstance(net,list):
+                    for net in net:
+                        for l,_ in enumerate(net.layers):
+                            name = net.species
+                            species[name] = 1
+                else:
+                    for l,_ in enumerate(net.layers):
+                        name = net.species
+                        species[name] = 1
+            n_species = len(species)
+
+
+            # Build all the required tensors
+            b = {}
+            if build_graph:
+                self.construct_network()
+                for s in species:
+                    b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
+            else:
+                for s in species:
+                    b[s] = self.graph.get_tensor_by_name('{}/b:0'.format(s))
+
+            cost_list = self.get_cost()
+            train_feed_dict, valid_feed_dict = self.get_feed('train')
+            cost = 0
+            if not isinstance(multiplier, list):
+                multiplier = [1.0]*len(cost_list)
+            print('multipliers: {}'.format(multiplier))
+            for c, m in zip(cost_list, multiplier):
+                cost += c*m
+
+            # L2-loss
+            loss = 0
+            with tf.variable_scope("", reuse=True):
+                for net in self.subnets:
+                    if isinstance(net,list):
+                        for net in net:
+                            for l, layer in enumerate(net.layers):
+                                name = net.species
+                                loss += tf.nn.l2_loss(tf.get_variable("{}/W{}".format(name, l+1))) * \
+                                        b[name]/layer
+                    else:
+                        for l, layer in enumerate(net.layers):
+                            name = net.species
+                            loss += tf.nn.l2_loss(tf.get_variable("{}/W{}".format(name, l+1))) * \
+                                b[name]/layer
+
+            cost += loss
+
+            for i, s in enumerate(species):
+                train_feed_dict['{}/b:0'.format(s)] = b_[i]
+                valid_feed_dict['{}/b:0'.format(s)] = 0
+
+
+            if self.optimizer == None:
+                if optimizer == None:
+                    self.optimizer = tf.train.AdamOptimizer(learning_rate = step_size)
+                else:
+                    self.optimizer = optimizer
+
+            train_step = self.optimizer.minimize(cost)
+
+            # Workaround to load the AdamOptimizer variables
+            if not self.checkpoint_path == None:
+                saver = tf.train.Saver()
+                saver.restore(self.sess,self.checkpoint_path)
+                self.checkpoint_path = None
+
+            initialize_uninitialized(self.sess)
+
+            self.initialized = True
+
+            train_writer = tf.summary.FileWriter('./log/',
+                                      self.graph)
+            old_cost = 1e8
+
+            for _ in range(0,max_steps):
+
+                sess.run(train_step,feed_dict=train_feed_dict)
+
+                if _%int(max_steps/100) == 0 and adaptive_rate == True:
+                    new_cost = sess.run(tf.sqrt(cost),
+                        feed_dict=train_feed_dict)
+
+                    if new_cost > old_cost:
+                        step_size /= 2
+                        print('Step size decreased to {}'.format(step_size))
+                        train_step = tf.train.GradientDescentOptimizer(step_size).minimize(cost)
+                    old_cost = new_cost
+
+                if _%int(max_steps/10) == 0 and verbose:
+                    print('Step: ' + str(_))
+                    print('Training set loss:')
+                    if len(cost_list) > 1:
+                        for i, c in enumerate(cost_list):
+                            print('{}: {}'.format(i,sess.run(tf.sqrt(c),feed_dict=train_feed_dict)))
+                    print('Total: {}'.format(sess.run(tf.sqrt(cost-loss),feed_dict=train_feed_dict)))
+                    print('Validation set loss:')
+                    if len(cost_list) > 1:
+                        for i, c in enumerate(cost_list):
+                            print('{}: {}'.format(i,sess.run(tf.sqrt(c),feed_dict=valid_feed_dict)))
+                    print('Total: {}'.format(sess.run(tf.sqrt(cost),feed_dict=valid_feed_dict)))
+                    print('--------------------')
+                    print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
+
+    def predict(self, data, species, species_index, processed = True):
+
+        if data.ndim == 2:
+            data = data.reshape(-1,1,data.shape[1])
+        else:
+            raise Exception('data.ndim != 2')
+
+        ds = Dataset(data, species, species_index,1)
+        targets = np.zeros(data.shape[0])
+        snet = Subnet()
+
+        found = False
+        for s in self.subnets:
+            if found == True:
+                break
+            if isinstance(s,list):
+                for s2 in s:
+                    if s2.species_index == ds.species_index:
+                        snet.scaler = s2.scaler
+                        snet.layers = s2.layers
+                        snet.targets = s2.targets
+                        snet.activations = s2.activations
+                        snet.features = s2.features
+
+                        print("Sharing scaler with species " + s2.species)
+                        found = True
+                        break
+            else:
+                if s.species_index == ds.species_index:
+                    snet.scaler = s.scaler
+                    snet.layers = s.layers
+                    snet.targets = s.targets
+                    snet.activations = s.activations
+                    snet.features = s.features
+                    print("Sharing scaler with species " + s.species)
+                    break
+
+        snet.add_datasets([ds], targets, processed = processed, test_size=0.0)
+        self = self % snet
+
+        result = self.get_logits()[-1]
+
+        del self.subnets[-1]
+
+        return result
+
+    def get_logits(self, summarize = True, which = 'train'):
+        """ Uses trained model on training or test sets
+
+        Parameters:
+        -----------
+        which: {'train','test'}; which set logits are computed for
+
+        Returns:
+        --------
+        [numpy.array]; resulting logits grouped by independent subnet datasets
+        """
+
+        if not self.model_loaded:
+            raise Exception('Model not loaded!')
+        else:
+            with self.graph.as_default():
+
+                logits_list = self.construct_network()
+
+                sess = self.sess
+                feed_dict, _ = self.get_feed(train_valid_split = 1.0, which = which)
+
+                return_list = []
+
+                for logits in logits_list:
+                    if isinstance(logits,list):
+                        result = 0
+                        for logits in logits:
+                            if summarize:
+                                result += sess.run(logits,feed_dict=feed_dict)
+                            else:
+                                return_list.append(sess.run(logits,feed_dict=feed_dict))
+                        if summarize:
+                            return_list.append(result)
+                    else:
+                        return_list.append(sess.run(logits,feed_dict=feed_dict))
+                return return_list
+
+    def save_model(self, path):
+        """ Save trained m = tf.train.AdamOptimizer(learning_rate = step_size)
+        """
+
+        if path[-5:] == '.ckpt':
+            path = path[:-5]
+
+        with self.graph.as_default():
+            sess = self.sess
+            saver = tf.train.Saver()
+            saver.save(sess,save_path = path + '.ckpt')
+
+    def restore_model(self, path):
+        """ Load trained model from path
+        """
+
+        if path[-5:] == '.ckpt':
+            path = path[:-5]
+
+        self.checkpoint_path = path + '.ckpt'
+        g = tf.Graph()
+        with g.as_default():
+            sess = tf.Session()
+            self.construct_network()
+            b = tf.placeholder(tf.float32,name = 'b')
+            saver = tf.train.Saver()
+            saver.restore(sess,path + '.ckpt')
+            self.model_loaded = True
+            self.sess = sess
+            self.graph = g
+            self.initialized = True
+
+    def save_all(self, net_dir, override = False):
+        """ Saves the model including all subnets and datasets
+        using pickle
+        """
+        try:
+            os.mkdir(net_dir)
+        except FileExistsError:
+            if override:
+                print('Overriding...')
+                import shutil
+                shutil.rmtree(net_dir)
+                os.mkdir(net_dir)
+            else:
+                print('Directory/Network already exists. Network not saved...')
+                return None
+
+        # Pickle does not seem to be compatible with tensorflow so just
+        # save subnetworks with it
+        with open(os.path.join(net_dir,'subnets'),'wb') as file:
+            pickle.dump(self.subnets,file)
+
+        self.save_model(os.path.join(net_dir,'model'))
+
+
+
+    def load_all(self, net_dir):
+        """ Loads the model including all subnets and datasets
+        using pickle
+        """
+
+        with open(os.path.join(net_dir,'subnets'),'rb') as file:
+            self.subnets = pickle.load(file)
+
+        self.restore_model(os.path.join(net_dir,'model'))
+
+class Subnet():
+    """ Subnetwork that is associated with one Atom
+    """
+
+    seed = 42
+
+    def __init__(self):
+        self.species = None
+        self.species_index = None
+        self.n_copies = 0
+        self.rad_param = None
+        self.ang_param = None
+        self.scaler = None
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.name = None
+        self.constructor = fc_nn_g
+        self.logits_name = None
+        self.x_name = None
+        self.y_name = None
+        self.layers = [32] * 3
+        self.targets = 1
+        self.activations = [tf.nn.sigmoid] * 3
+        self.features = 0
+
+    def __add__(self, other):
+        if not isinstance(other,Subnet):
+            raise Exception("Incompatible data types")
+        else:
+            return Network([[self,other]])
+
+    def __mod__(self, other):
+        if not isinstance(other,Subnet):
+            raise Exception("Incompatible data types")
+        else:
+            return Network([[self],[other]])
+
+
+    def get_feed(self, which, train_valid_split = 0.8, seed = None):
+        """ Return a dictionary that can be used as a feed_dict in tensorflow
+
+        Parameters:
+        -----------
+        which: {'train', 'valid', 'test'}, which part of the dataset is used
+        train_valid_split: float; ratio of train and validation set size
+        seed: int; seed parameter for the random shuffle algorithm, make
+
+        Returns:
+        --------
+        dictionary
+        """
+        if seed == None:
+            seed = Subnet.seed
+
+        if train_valid_split == 1.0:
+            shuffle = False
+        else:
+            shuffle = True
+
+
+        if which == 'train' or which == 'valid':
+
+            X_train = np.concatenate([self.X_train[i] for i in range(self.n_copies)],
+                axis = 1)
+
+            X_train, X_valid, y_train, y_valid = \
+                train_test_split(X_train,self.y_train,
+                                 test_size = 1 - train_valid_split,
+                                 random_state = seed, shuffle = shuffle)
+            X_train, X_valid = reshape_group(X_train, self.n_copies) , \
+                               reshape_group(X_valid, self.n_copies)
+
+            if which == 'train':
+                return {self.x_name : X_train, self.y_name: y_train}
+            else:
+                return {self.x_name : X_valid, self.y_name : y_valid}
+
+        elif which == 'test':
+
+            return {self.x_name : self.X_test, self.y_name: self.y_test}
+
+
+
+    def get_logits(self, i):
+        """ Builds the subnetwork by defining logits and placeholders
+
+        Parameters:
+        -----------
+        i: int; index to label datasets
+
+        Returns:
+        ---------
+        logits, x, y: tensorflow tensors
+        """
+
+        with tf.variable_scope(self.name) as scope:
+                        try:
+                            logits,x,y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
+                        except ValueError:
+                            scope.reuse_variables()
+                            logits,x,y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
+
+        self.logits_name = logits.name
+        self.x_name = x.name
+        self.y_name = y_.name
+        return logits, x, y_
+
+    def save(self, path):
+        """ Use pickle to save the subnet to path
+        """
+
+        with open(path,'wb') as file:
+            pickle.dump(self,file)
+
+    def load(self, path):
+        """ Load subnet from path
+        """
+
+        with open(path, 'rb') as file:
+            self = pickle.load(file)
+
+    def add_datasets(self, datasets, targets, processed = False, which = -1,
+        fraction = 1.0, target_filter = None, test_size = 0.2, scale = True):
+        """ Adds datasets to the subnetwork. First set in 'datasets' determines
+        species that subnet is associated with
+
+        Parameters:
+        -----------
+        datasets: list of datasets (defined in prepocessing.py); contains
+            datasets that will be associated with subnetwork for training and
+            evaluation
+        targets: (?,1) or (?) numpy array; target values for training and
+            evaluation
+
+        Returns:
+        --------
+        None
+        """
+
+        if self.species != None and self.species_index != None:
+            if self.species != datasets[0].species or \
+                self.species != datasets[0].species_index:
+                raise Exception("Dataset species does not equal subnet species")
+        else:
+            self.species = datasets[0].species
+            self.species_index = datasets[0].species_index
+
+        if not self.n_copies == 0:
+            if self.n_copies != datasets[0].n:
+                raise Exception("New dataset incompatible with contained one.")
+
+        self.n_copies = datasets[0].n
+        self.name = datasets[0].species
+
+
+        # Preprocess
+        if not processed:
+            features = preprocess(datasets,
+                                                self.rad_param,
+                                                self.ang_param,
+                                                which = which,
+                                                fraction = fraction,
+                                                seed = Subnet.seed).data
+            features = features.swapaxes(0,1)
+        else:
+            features = datasets[0].data.swapaxes(0,1)
+
+        # Normalize
+        features_flat = np.concatenate([features[i] for i in range(self.n_copies)],
+            axis = 1)
+
+        # Only use a fraction of the dataset
+        if fraction < 1.0:
+            y, _ = train_test_split(targets,
+            test_size = 1-fraction, random_state = Subnet.seed, shuffle = True)
+        else:
+            y = targets
+        # Filter data samples by target value
+        if not target_filter == None:
+            if not isinstance(target_filter,list):
+                raise Exception("target_filter must be a list [min,max]")
+
+            filt = (y > target_filter[0]) & (y < target_filter[1])
+
+            y = y[filt]
+            features_flat =  features_flat[filt]
+
+        if not test_size == 0.0:
+            X_train, X_test, y_train, y_test = \
+                train_test_split(features_flat, y,
+                    test_size= test_size, random_state = Subnet.seed, shuffle = True)
+        else:
+            X_train = features_flat
+            y_train = y
+            X_test = np.copy(X_train)
+            y_test = np.copy(y_train)
+
+        if scale:
+            if self.scaler == None:
+                scaler = MinMaxScaler(feature_range = (-1,1), copy = False)
+                scaler.fit(X_train.reshape(len(X_train) * self.n_copies,
+                           int(X_train.shape[1]/self.n_copies)))
+            else:
+                scaler = self.scaler
+
+        # Normalization parameters are determined by considering all copies
+        # of one species
+        X_train = reshape_group(X_train, self.n_copies)
+        X_test = reshape_group(X_test, self.n_copies)
+
+        if scale:
+            for i in range(self.n_copies):
+                X_train[i] = scaler.transform(X_train[i])
+                X_test[i] = scaler.transform(X_test[i])
+
+        self.X_train = X_train
+        self.X_test = X_test
+        if y_train.ndim == 1:
+            self.y_train = y_train.reshape(-1,1)
+            self.y_test = y_test.reshape(-1,1)
+        else:
+            self.y_train = y_train
+            self.y_test = y_test
+        self.features = X_train.shape[2]
+        if scale:
+            self.scaler = scaler
+
+def load_network(path):
+    network = Network([])
+    network.load_all(path)
+    return network
