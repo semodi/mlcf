@@ -8,7 +8,7 @@ import os
 from elf import ElF
 import ipyparallel as ipp
 import re
-import pandas as pd 
+import pandas as pd
 
 class serial_view():
     def __init__(self):
@@ -24,7 +24,11 @@ def get_view(profile = 'default'):
     return view
 
 def __get_elfs(path, atoms, basis, method):
-    density = elf.siesta.get_density_bin(path)
+    # density = elf.siesta.get_density_bin(path)
+    try:
+        density = elf.siesta.get_density(path)
+    except UnicodeDecodeError:
+        density = elf.siesta.get_density_bin(path)
     return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
 
 def atoi(text):
@@ -114,26 +118,60 @@ def elfs_to_hdf5(elfs, path):
     file['system'] = np.array(systems)
     file.flush()
 
-def hdf5_to_elfs(path, species_filter = ''):
+def hdf5_to_elfs(path, species_filter = '', grouped = False,
+        values_only = False, angles_only = False):
+
     file = h5py.File(path, 'r')
     basis = json.loads(file.attrs['basis'])
     print(basis)
-    elfs = []
-    current_system = -1
+    if values_only and angles_only:
+        raise Exception('Cannot return values and angles only at the same time')
+    if values_only:
+        grouped = True
+
+    if grouped:
+        elfs_grouped = {}
+    else:
+        elfs = []
+
+    if grouped:
+        current_system_grouped = {}
+    else:
+        current_system = -1
+
     for value, length, species, angles, system in zip(file['value'],
                                                   file['length'],
                                                   file['species'],
                                                   file['angles'],
                                                   file['system']):
+        species = species.astype(str).lower()
         if len(species_filter) > 0 and\
-         (not (species.astype(str).lower() in species_filter.lower())):
+         (not (species in species_filter.lower())):
             continue
+
+        if grouped:
+            if not species in elfs_grouped:
+                elfs_grouped[species] = []
+                current_system_grouped[species] = -1
+            elfs = elfs_grouped[species]
+            current_system = current_system_grouped[species]
 
         if system != current_system:
             elfs.append([])
-            current_system = system
+            if grouped:
+                current_system_grouped[species] = system
+            else:
+                current_system = system
 
-        bas =  dict(filter(lambda x: species.astype(str).lower() in x[0].lower(), basis.items()))
-        elfs[system].append(ElF(value[:length], angles, bas, species.astype(str),np.zeros(3)))
+        bas =  dict(filter(lambda x: species in x[0].lower(), basis.items()))
 
+        if values_only:
+            elfs[system].append(value[:length])
+        elif angles_only:
+            elfs[system].append(angles)
+        else:
+            elfs[system].append(ElF(value[:length], angles, bas, species, np.zeros(3)))
+
+    if grouped:
+        elfs = elfs_grouped
     return elfs

@@ -8,7 +8,7 @@ from sympy import N
 # Transformation matrix between radial and euclidean (real) representation of
 # a rank-1 tensor
 T = np.array([[1j,0,1j], [0,np.sqrt(2),0], [1,0,-1]]) * 1/np.sqrt(2)
-ANGLE_THRESHOLD = 1e-5
+ANGLE_THRESHOLD = 1e-6
 NORM_THRESHOLD = 1e-3
 def get_max(tensor):
     """
@@ -226,21 +226,21 @@ def get_elfcs_angles(i, coords, tensor):
     len_normal = len(p)
     # In case p-orbitals are not enough, calculate more l=1 tensors
     # by combining different angular momenta
-    p_extended = tensor_to_P(tensor)
-    p = np.concatenate([p, p_extended], axis = 0).astype(float)
+#    p_extended = tensor_to_P(tensor)
+#    p = np.concatenate([p, p_extended], axis = 0).astype(float)
     # p = p_extended
     k = 0
     for k, d in enumerate(p):
         if norm(d) > NORM_THRESHOLD:
-            # print('Axis1 with elf')
+            print('Axis1 with elf, {}: {}'.format(k, norm(p[k])))
             axis1 = p[k]/norm(p[k])
             break
     for u, d in enumerate(p[k:]):
         # Find another p-orbital (or l=1 tensor) that is not collinear
         # with the first axis
         if norm(d) > NORM_THRESHOLD and 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > ANGLE_THRESHOLD:
-            # print('Axis2 with elf, {}, {}: {}'.format(['normal', 'extended'][int(k + u >= len_normal)],
-                    # k+u, norm(d)))
+            print('Axis2 with elf, {}, {}: {}'.format(['normal', 'extended'][int(k + u >= len_normal)],
+                    k+u, norm(d)))
             axis2 = d
             break
     # If everything fails, pick the direction to the nearest atom as
@@ -253,7 +253,7 @@ def get_elfcs_angles(i, coords, tensor):
         for o in order:
             axis2 = coords[o] - c
             if 1 - np.abs(axis2.dot(axis1)/norm(axis2)) > ANGLE_THRESHOLD:
-                # print('Axis2 with nn')
+                print('Axis2 with nn')
                 break
         else:
             raise Exception('Could not determine orientation. Aborting...')

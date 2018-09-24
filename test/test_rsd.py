@@ -29,6 +29,24 @@ def test_rs_elf():
     for key in elf:
         assert np.allclose(elf[key], elf_ref[key])
 
+# def test_rot_invariance_elfcs():
+#     """Test if the ElF algorithm is rotationally invariant, by calculating oriented
+#     elfs for monomers that are rotated copies of each other
+#     """
+#     elfs = preprocess_all('./test/dimers_rotated_400', basis)
+#     elfs = np.array([e[0].value for e in elfs])
+#     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
+#     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
+#
+# def test_rot_invariance_nncs():
+#     """Test if the nearest-neighbor algorithm is rotationally invariant, by calculating
+#     oriented elfs for monomers that are rotated copies of each other
+#     """
+#     elfs = preprocess_all('./test/dimers_rotated', basis, method = 'nn')
+#     elfs = np.array([e[0].value for e in elfs])
+#     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
+#     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
+
 def test_nncs():
     """ Test whether nearest neighbor reproduces the reference values for elf
     """
@@ -57,7 +75,7 @@ def test_elfcs():
     """ Test whether the ElF algorithm reproduces the reference values for elf
     """
     # Test the ElF alignment (ElF rule)
-    for i in [0,3]:
+    for i in [0,3,0]:
         print('======Testing {} =========='.format(i))
         angles1 = get_elfcs_angles(i, atoms.get_positions(), elf[i])
         print(angles1)
@@ -76,9 +94,9 @@ def test_elfcs():
                 assert np.allclose(rotated1[key], rotated2[key], atol= 1e-3, rtol = 1e-3)
 
     # pickle.dump(rotated1, open('./test/elf_elfcs.dat','wb'))
-    # elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
-    # for key in elf[0]:
-        # assert np.allclose(rotated1[key], elf_ref[key])
+    elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
+    for key in elf[0]:
+        assert np.allclose(rotated1[key], elf_ref[key])
 
 def test_orient_elfs():
     """ Test the method orient_elfs()
