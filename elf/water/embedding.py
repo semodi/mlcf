@@ -10,6 +10,9 @@ qm = -2*qh
 r_om = 0.1546
 
 def waterc_to_tip4p(coords):
+    """ Starting from water coordinates, return the     
+    parameters of a tip4p model describing the same system
+    """
     norm = np.linalg.norm
     if coords.ndim == 2:
         coords = coords.reshape(-1,3,3)
@@ -38,7 +41,9 @@ def waterc_to_tip4p(coords):
     return np.concatenate([m,h1,h2], axis =  -1).reshape(-1,3,4)
     
 def tip4p_to_str(arr):
-    
+    """ Giving a tip4p array (created with waterc_to_tip4p) return 
+    a string that can be used inside a SIESTA input file 
+    """
     siesta_str = '%block Geometry.Charge \n'
     
     # M 
@@ -55,25 +60,3 @@ def tip4p_to_str(arr):
     siesta_str += '%endblock Geometry.Charge \n'
     return siesta_str
 
-def sample_dimers(coords, roo, epsilon = 0.1):
-    if not coords.ndim == 3 or not coords.shape[1:] == (3,3):
-        raise Exception('coords.shape must be (?, 3, 3)')
-    
-    coords = coords[:,0]
-    found = False
-    counter = 0
-    while not found:
-        counter += 1
-        seed = np.random.randint(0,len(coords))
-        seed_O = coords[seed]
-        nn = NearestNeighbors(8)
-        nn.fit(coords)
-        dist, ind = nn.kneighbors([seed_O])
-        check = (dist > roo-epsilon)& (dist < roo+epsilon)
-        if counter > 200:
-            return -1,-1
-        if np.sum(check):
-            break
-    where = np.where(check)[1][0]
-    print(np.linalg.norm((coords[seed] - coords[ind[0,where]])))
-    return seed, ind[0,where]
