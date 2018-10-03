@@ -90,7 +90,7 @@ def fc_nn_g(network, i, mean = 0, std = 1):
     b = []
     hidden = []
     x = tf.placeholder(tf.float32,[n_copies,None,features],'x' + str(i))
-    y_ = tf.placeholder(tf.float32,[None, 1], 'y_' + str(i))
+    y_ = tf.placeholder(tf.float32,[None, targets], 'y_' + str(i))
 
 
 
@@ -108,9 +108,11 @@ def fc_nn_g(network, i, mean = 0, std = 1):
 
 
     for n_g in range(n_copies):
-        hidden.append(activations[0](tf.matmul(tf.gather(x,n_g),W[0])/features*10 + b[0]))
+        # hidden.append(activations[0](tf.matmul(tf.gather(x,n_g),W[0])/features*10 + b[0]))
+        hidden.append(activations[0](tf.matmul(tf.gather(x,n_g),W[0]) + b[0]))
         for l in range(0,n-1):
-            hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1])/layers[l]*10 + b[l+1]))
+            # hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1])/layers[l]*10 + b[l+1]))
+            hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1]) + b[l+1]))
 
         if n_g == 0:
             logits = tf.matmul(hidden[n_g*n+n-1],W[n])+b[n]

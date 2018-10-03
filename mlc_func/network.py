@@ -17,7 +17,7 @@ from matplotlib import pyplot as plt
 import math
 import pickle
 from collections import namedtuple
-Dataset = namedtuple("Dataset", "data species species_index n")
+Dataset = namedtuple("Dataset", "data species")
 
 
 class Network():
@@ -39,6 +39,8 @@ class Network():
         self.initialized = False
         self.optimizer = None
         self.checkpoint_path = None
+        self.masks = {}
+        scale_together(subnets)
 
     # ========= Network operations ============ #
 
@@ -305,14 +307,16 @@ class Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, data, species, species_index, processed = True):
+    def predict(self, data, species, use_masks = False):
 
         if data.ndim == 2:
             data = data.reshape(-1,1,data.shape[1])
         else:
             raise Exception('data.ndim != 2')
+        if use_masks:
+            data = data[:,:,self.masks[species]]
 
-        ds = Dataset(data, species, species_index,1)
+        ds = Dataset(data, species)
         targets = np.zeros(data.shape[0])
         snet = Subnet()
 
@@ -322,27 +326,24 @@ class Network():
                 break
             if isinstance(s,list):
                 for s2 in s:
-                    if s2.species_index == ds.species_index:
+                    if s2.species == ds.species:
                         snet.scaler = s2.scaler
                         snet.layers = s2.layers
                         snet.targets = s2.targets
                         snet.activations = s2.activations
-                        snet.features = s2.features
-
                         print("Sharing scaler with species " + s2.species)
                         found = True
                         break
             else:
-                if s.species_index == ds.species_index:
+                if s.species == ds.species:
                     snet.scaler = s.scaler
                     snet.layers = s.layers
                     snet.targets = s.targets
                     snet.activations = s.activations
-                    snet.features = s.features
                     print("Sharing scaler with species " + s.species)
                     break
 
-        snet.add_datasets([ds], targets, processed = processed, test_size=0.0)
+        snet.add_dataset(ds, targets, test_size=0.0)
         self = self % snet
 
         result = self.get_logits()[-1]
@@ -455,6 +456,7 @@ class Network():
             self.subnets = pickle.load(file)
 
         self.restore_model(os.path.join(net_dir,'model'))
+        self.masks = pickle.load(open(net_dir + '/' +'masks', 'rb'))
 
 class Subnet():
     """ Subnetwork that is associated with one Atom
@@ -464,7 +466,6 @@ class Subnet():
 
     def __init__(self):
         self.species = None
-        self.species_index = None
         self.n_copies = 0
         self.rad_param = None
         self.ang_param = None
@@ -478,10 +479,9 @@ class Subnet():
         self.logits_name = None
         self.x_name = None
         self.y_name = None
-        self.layers = [32] * 3
+        self.layers = [8] * 3
         self.targets = 1
         self.activations = [tf.nn.sigmoid] * 3
-        self.features = 0
 
     def __add__(self, other):
         if not isinstance(other,Subnet):
@@ -579,14 +579,13 @@ class Subnet():
         with open(path, 'rb') as file:
             self = pickle.load(file)
 
-    def add_datasets(self, datasets, targets, processed = False, which = -1,
-        fraction = 1.0, target_filter = None, test_size = 0.2, scale = True):
-        """ Adds datasets to the subnetwork. First set in 'datasets' determines
-        species that subnet is associated with
+    def add_dataset(self, dataset, targets,
+        test_size = 0.2, target_filter = None, scale = True):
+        """ Adds dataset to the subnetwork.
 
         Parameters:
         -----------
-        datasets: list of datasets (defined in prepocessing.py); contains
+        dataset: dataset (a named tuple (data, species, n_copies)); contains
             datasets that will be associated with subnetwork for training and
             evaluation
         targets: (?,1) or (?) numpy array; target values for training and
@@ -597,93 +596,58 @@ class Subnet():
         None
         """
 
-        if self.species != None and self.species_index != None:
-            if self.species != datasets[0].species or \
-                self.species != datasets[0].species_index:
+        if self.species != None:
+            if self.species != dataset.species:
                 raise Exception("Dataset species does not equal subnet species")
         else:
-            self.species = datasets[0].species
-            self.species_index = datasets[0].species_index
+            self.species = dataset.species
 
         if not self.n_copies == 0:
-            if self.n_copies != datasets[0].n:
+            if self.n_copies != dataset.data.shape[1]:
                 raise Exception("New dataset incompatible with contained one.")
 
-        self.n_copies = datasets[0].n
-        self.name = datasets[0].species
+        self.n_copies = dataset.data.shape[1]
+        self.name = dataset.species
 
-
-        # Preprocess
-        if not processed:
-            features = preprocess(datasets,
-                                                self.rad_param,
-                                                self.ang_param,
-                                                which = which,
-                                                fraction = fraction,
-                                                seed = Subnet.seed).data
-            features = features.swapaxes(0,1)
-        else:
-            features = datasets[0].data.swapaxes(0,1)
-
-        # Normalize
-        features_flat = np.concatenate([features[i] for i in range(self.n_copies)],
-            axis = 1)
-
-        # Only use a fraction of the dataset
-        if fraction < 1.0:
-            y, _ = train_test_split(targets,
-            test_size = 1-fraction, random_state = Subnet.seed, shuffle = True)
-        else:
-            y = targets
-        # Filter data samples by target value
-        if not target_filter == None:
-            if not isinstance(target_filter,list):
-                raise Exception("target_filter must be a list [min,max]")
-
-            filt = (y > target_filter[0]) & (y < target_filter[1])
-
-            y = y[filt]
-            features_flat =  features_flat[filt]
 
         if not test_size == 0.0:
             X_train, X_test, y_train, y_test = \
-                train_test_split(features_flat, y,
+                train_test_split(dataset.data, targets,
                     test_size= test_size, random_state = Subnet.seed, shuffle = True)
         else:
-            X_train = features_flat
-            y_train = y
-            X_test = np.copy(X_train)
-            y_test = np.copy(y_train)
+            X_train = dataset.data
+            y_train = targets
+            X_test = np.array(X_train)
+            y_test = np.array(y_train)
 
         if scale:
             if self.scaler == None:
-                scaler = MinMaxScaler(feature_range = (-1,1), copy = False)
-                scaler.fit(X_train.reshape(len(X_train) * self.n_copies,
-                           int(X_train.shape[1]/self.n_copies)))
+                scaler = StandardScaler()
+                # scaler = MinMaxScaler(feature_range=(-2,2))
+                scaler.fit(X_train.reshape(-1, X_train.shape[2]))
             else:
                 scaler = self.scaler
 
-        # Normalization parameters are determined by considering all copies
-        # of one species
-        X_train = reshape_group(X_train, self.n_copies)
-        X_test = reshape_group(X_test, self.n_copies)
+            X_train = scaler.transform(X_train.reshape(-1,
+                X_train.shape[2])).reshape(X_train.shape)
+            X_test = scaler.transform(X_test.reshape(-1,
+                X_test.shape[2])).reshape(X_test.shape)
 
-        if scale:
-            for i in range(self.n_copies):
-                X_train[i] = scaler.transform(X_train[i])
-                X_test[i] = scaler.transform(X_test[i])
+            self.scaler = scaler
 
-        self.X_train = X_train
-        self.X_test = X_test
+        self.X_train = X_train.swapaxes(0,1)
+        self.X_test = X_test.swapaxes(0,1)
+        self.features = X_train.shape[2]
+
         if y_train.ndim == 1:
             self.y_train = y_train.reshape(-1,1)
             self.y_test = y_test.reshape(-1,1)
         else:
             self.y_train = y_train
             self.y_test = y_test
-        self.features = X_train.shape[2]
-        if scale:
-            self.scaler = scaler
+
+        assert len(X_train) == len(y_train)
+        assert len(X_test) == len(y_test)
 
 def load_network(path):
     network = Network([])
