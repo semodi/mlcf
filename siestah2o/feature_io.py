@@ -9,7 +9,7 @@ import pickle
 import siesta_utils.grid as siesta
 import ipyparallel as parallel
 import elf
-
+import json
 
 def find_h2o(atoms):
     atomic_numbers = atoms.get_atomic_numbers()
@@ -91,23 +91,35 @@ class MullikenGetter(FeatureGetter):
 
 class DescriptorGetter(FeatureGetter):
 
-    def __init__(self, client = None):
+    def __init__(self, method, basis, client = None):
         # client = parallel.Client(profile='default')
         super().__init__(1, n_o_orb = 0, n_h_orb= 0, client = client)
-        self.basis = {'r_o_o': 0.9,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_o_h' : 1.35,
-                      'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
-                      'n_l_h' : 2, 'gamma_o': 0, 'gamma_h': 0}
-
+        self.basis = basis
+        with open('basis.json','w') as basisfile:
+            basisfile.write(json.dumps(self.basis))
         self.scalers = {}
-
+        self.method = method
+        self.masks = {}
+        with open('method','w') as methodfile:
+            methodfile.write(self.method)
+         
     def set_scalers(self, scalers):
         self.scalers = scalers
 
+    def set_masks(self, masks):
+        self.masks = masks
+
     def get_features(self, atoms):
+
+        # if not mask is set use all features
+        if len(self.masks) != 2:
+            self.masks['o'] = [True] * 1000
+            self.masks['h'] = [True] * 1000
+
         density = elf.siesta.get_density_bin('./H2O.RHOXC')
 
         elfs = elf.real_space.get_elfs_oriented(atoms, density,
-                self.basis, 'elf', self.view)
+                self.basis, self.method, self.view)
 
         elfs_dict = {}
         angles_dict = {}
@@ -115,7 +127,7 @@ class DescriptorGetter(FeatureGetter):
             if not e.species in elfs_dict:
                 elfs_dict[e.species] = []
                 angles_dict[e.species] = []
-            elfs_dict[e.species].append(e.value)
+            elfs_dict[e.species].append(e.value[self.masks[e.species.lower()][:len(e.value)]])
             angles_dict[e.species].append(e.angles)
 
         for symbol in elfs_dict:

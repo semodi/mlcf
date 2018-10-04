@@ -237,22 +237,27 @@ class SiestaH2OAtomic(Siesta):
 
                 for key in prediction:
                     prediction[key] = prediction[key].tolist()
-
+                
+                masses = []
+                species_counter = {}
                 for i, chem_sym in enumerate(atoms.get_chemical_symbols()):
                     if chem_sym in prediction:
                         correction_force[i] = np.array(prediction[chem_sym].pop(0))
+                        masses.append(atoms.get_masses()[i])
+                    else:
+                        masses.append(0)
+
+                masses = np.array(masses).reshape(-1,1)
 
                 for key in prediction:
                     assert len(prediction[key]) == 0
 
-#                 if settings['cmcorrection']:
-#                     # Subtract mean force
-#                     mass_O = atoms.get_masses()[h2o_indices][0]
-#                     mass_H = atoms.get_masses()[h2o_indices][1]
-#                     mean_correction = np.mean(correction_force, axis = 0)/(mass_O + 2 * mass_H)
-#                     correction_force[::3] -= mass_O * mean_correction * 3
-#                     correction_force[1::3] -= mass_H * mean_correction * 3
-#                     correction_force[2::3] -= mass_H * mean_correction * 3
+                if settings['cmcorrection']:
+                    # Subtract mean force
+                    mean_correction = np.mean(correction_force, axis = 0)*len(correction_force)/np.sum(masses)
+                    print(mean_correction)
+                    correction_force -= mean_correction * masses
+                
                 features = {}
                 for key in elfs_dict:
                     features[key] = np.concatenate([np.array(elfs_dict[key]),

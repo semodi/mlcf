@@ -17,6 +17,7 @@ import time
 import config
 import pickle
 import keras
+import json
 try:
     from mbpol_calculator import *
 except ImportError:
@@ -26,9 +27,9 @@ from read_input import settings, mixing_settings
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
-#os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
+os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
 # os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
-os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Physics/Code/siesta-4.1-b3/psf/'
+#os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Physics/Code/siesta-4.1-b3/psf/'
 
 #Try to run siesta with mpi if that fails run serial version
 try:
@@ -53,6 +54,18 @@ except OSError:
     n_clients = 0
 if n_clients == 0:
     n_clients = 1
+
+def log_all(energy = None,forces=None):
+    if energy == None: #Initialize
+        with open('energies.dat', 'w') as file:
+            file.write('Siesta\n')
+        with open('forces.dat', 'w') as file:
+            pass
+    else:
+        with open('energies.dat', 'a') as file:
+            file.write('{:.4f}\n'.format(energy))
+        with open('forces.dat', 'a') as file:
+            np.savetxt(file, forces, fmt = '%.4f')
 
 if __name__ == '__main__':
 
@@ -88,28 +101,42 @@ if __name__ == '__main__':
         model_path = settings_choice['model' + i]
 
         #============RSD=====================
-        if settings_choice['modelkind' + i] in ['atomic','none','molecular']:
+        if settings_choice['modelkind' + i] in ['elf','none','nn']:
             calc = SiestaH2OAtomic(basis= settings_choice['basis' + i],
                                 xc= settings_choice['xcfunctional' + i].upper(),
                                 log_accuracy = True)
-            if n_clients > 1:
-                descr_getter = DescriptorGetter(client)
-            else:
-                descr_getter = DescriptorGetter()
+            
+            if  settings_choice['modelkind' + i] != 'none':
+                with open(model_path +'basis.json','r') as basisfile:
+                    basis = json.loads(basisfile.readline()) 
+
+                method = settings_choice['modelkind' + i]
+                if n_clients > 1:
+                    descr_getter = DescriptorGetter(method, basis, client)
+                else:
+                    descr_getter = DescriptorGetter(method, basis)
 
             # if settings_choice['modelkind' + i] in ['atomic']:
             #     descr_getter.single_thread = single_thread_descriptors_atomic
             # else:
             #     descr_getter.single_thread = single_thread_descriptors_molecular
             #
-            if  settings_choice['modelkind' + i] != 'none':
 
                 scaler_o = pickle.load(open(model_path + 'scaler_O','rb'))
                 scaler_h = pickle.load(open(model_path + 'scaler_H','rb'))
+                try:
+                    mask_o = np.genfromtxt(model_path + 'mask_O',dtype='str')
+                    mask_h = np.genfromtxt(model_path + 'mask_H',dtype='str')
+                    mask_o = [{'True': True, 'False': False}[m] for m in mask_o]
+                    mask_h = [{'True': True, 'False': False}[m] for m in mask_h]
+                    masks = {'o': mask_o, 'h': mask_h}
+                    descr_getter.set_masks(masks)
+                except FileNotFoundError:
+                    pass 
+
                 scalers = {'o': scaler_o, 'h': scaler_h}
                 descr_getter.set_scalers(scalers)
                 calc.set_feature_getter(descr_getter)
-
                 krr_o = keras.models.load_model(model_path + 'force_O')
                 krr_h = keras.models.load_model(model_path + 'force_H')
                 calc.set_force_model(krr_o, krr_h)
@@ -172,10 +199,14 @@ if __name__ == '__main__':
     time_step = Timer('Timer')
     if settings['integrator'] == 'none':
         frame_list = read('../' + settings['xyzpath'], ':')
+        log_all()
         for frame in frame_list:
             time_step.start_timer()
             h2o.set_positions(frame.get_positions())
-            h2o.get_potential_energy()
+            
+            energy = h2o.get_potential_energy()
+            forces = h2o.get_forces()
+            log_all(energy,forces)
             time_step.stop()
     else:
         for i in range(settings['Nt']):
@@ -184,3 +215,5 @@ if __name__ == '__main__':
             if settings['mixing']:
                 h2o.calc.increment_step()
             time_step.stop()
+
+
