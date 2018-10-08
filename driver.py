@@ -27,7 +27,7 @@ from read_input import settings, mixing_settings
 
 #TODO: Get rid of absolute paths
 os.environ['QT_QPA_PLATFORM']='offscreen'
-os.environ['SIESTA_PP_PATH'] = '/gpfs/home/smdick/psf/'
+os.environ['SIESTA_PP_PATH'] = '/home/sebastian/psf/'
 # os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Code/siesta-4.0.1/psf/'
 #os.environ['SIESTA_PP_PATH'] = '/home/sebastian/Documents/Physics/Code/siesta-4.1-b3/psf/'
 

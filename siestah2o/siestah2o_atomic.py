@@ -1,11 +1,8 @@
 import sys
 import os
-from xcml.misc import use_model, find_mulliken, getM_, find_basis, getM_from_DMS, use_force_model, use_force_model_atomic
-from xcml.misc import use_model_descr, use_force_model_fd, rotate_vector_real
-from xcml import load_network, box_fast, fold_back_coords
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 from .timer import Timer
-from .feature_io import FeatureGetter, DescriptorGetter, MullikenGetter
+from .feature_io import FeatureGetter, DescriptorGetter
 import keras
 try:
     from ase.calculators.siesta.parameters import Species
@@ -17,12 +14,11 @@ from ase.units import Ry
 from ase.io import Trajectory
 import numpy as np
 import pickle
-import siesta_utils.grid as siesta
-from siesta_utils.grid import AtoBohr
 import ipyparallel as parallel
 from read_input import settings, mixing_settings
 import elf
 import subprocess
+
 offset_nn = (-469.766523)
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -164,7 +160,7 @@ class SiestaH2OAtomic(Siesta):
 
     def set_nn_path(self, path):
         self.nn_path = path
-        load_network(self.nn_path)
+#        load_network(self.nn_path)
         self.corrected_e = True
 
     def set_force_model(self, krr_o, krr_h):
