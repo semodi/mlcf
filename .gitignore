@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -115,3 +116,19 @@ monomers_rotated*
 *.eps
 *.csv
 jupyter/
+workdir/
+*.png
+h2o.*
+__pycache__/
+*.swp
+siesta/
+*egg-info/
+.ipynb_checkpoints/
+TIME*
+test_run/
+H2O*
+*.pdf
+*.eps
+force_test/
+md_siesta.traj
+
