@@ -1,7 +1,7 @@
 import sys
 import os
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
-from .timer import Timer
+from mlc_func import Timer
 from .feature_io import FeatureGetter, DescriptorGetter
 import keras
 try:

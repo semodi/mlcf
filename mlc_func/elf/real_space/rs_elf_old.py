@@ -12,41 +12,8 @@ from mlc_func.elf.geom import get_nncs_angles, get_elfcs_angles
 from mlc_func.elf.geom import make_real, rotate_tensor, fold_back_coords
 from mlc_func.elf import ElF
 from mlc_func.elf.utils import serial_view
-from mlc_func import Timer
 
-def mesh_around(pos, radius, density, unit = 'A'):
-    '''
-    Similar to box_around but only returns mesh
-    '''
 
-    if pos.shape != (1,3) and (pos.ndim != 1 or len(pos) !=3):
-        raise Exception('please provide only one point for pos')
-
-    pos = pos.flatten()
-
-    U = np.array(density.unitcell) # Matrix to go from real space to mesh coordinates
-    for i in range(3):
-        U[i,:] = U[i,:] / density.grid[i]
-    a = np.linalg.norm(density.unitcell, axis = 1)/density.grid[:3]
-    U = U.T
-
-    #Create box with max. distance = radius
-    rmax = np.ceil(radius / a).astype(int).tolist()
-    Xm, Ym, Zm = density.mesh_3d(scaled = False, pbc= False, rmax = rmax, indexing = 'ij')
-    X, Y, Z = density.mesh_3d(scaled = True, pbc= False, rmax = rmax, indexing = 'ij')
-
-    #Find mesh pos.
-    cm = np.round(np.linalg.inv(U).dot(pos)).astype(int)
-    dr = pos  - U.dot(cm)
-    X -= dr[0]
-    Y -= dr[1]
-    Z -= dr[2]
-
-    Xm = (Xm + cm[0])%density.grid[0]
-    Ym = (Ym + cm[1])%density.grid[1]
-    Zm = (Zm + cm[2])%density.grid[2]
-
-    return Xm, Ym, Zm
 
 def box_around(pos, radius, density, unit = 'A'):
     '''
@@ -236,23 +203,17 @@ def atomic_elf(pos, density, basis, chem_symbol):
 
     return coeff
 
-def get_elf_thread(pos, density, basis, chem_symbol,
+def get_elf_oriented_thread(pos, density, basis, chem_symbol,
     i, all_positions, mode):
     """ Method that should be used in a parallel executions.
     One thread/process computes and orients the ElF for a single atom
     inside a system
     """
+    e = ElF(atomic_elf(pos, density, basis, chem_symbol),[0,0,0],basis,
+        chem_symbol,density.unitcell)
+    elf_oriented = orient_elf(i,e,all_positions,mode)
 
-    values = list(map(atomic_elf, pos, density, basis, chem_symbol))
-    elfs = [ElF(v,[0,0,0],b,
-        c,d.unitcell) for v,b,c,d in zip(values, basis, chem_symbol, density)]
-
-    if not mode == 'none':
-        elf_oriented = list(map(orient_elf,i,elfs,[all_positions]*len(elfs),
-            [mode]*len(elfs)))
-        return elf_oriented
-    else:
-        return elfs
+    return(elf_oriented)
 
 
 def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
@@ -276,70 +237,39 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     --------
     list; list containing the complex/real atomic ELFs '''
 
-    def distribute_workload(array, n_workers):
-        job_list = []
-        for w in range(n_workers):
-            job_list.append(array[w::n_workers])
-        return job_list
-
-    basis_species = np.unique([b[-1] for b in basis\
-        if b[-2] == '_'])
-
-    time_all = Timer('TIME_GET_ELFS')
     density_list = []
     pos_list = []
     sym_list = []
     basis_list = []
-    indices_list = []
-    time_setup = Timer('TIME_GET_ELFS_SETUP')
-    n_workers = len(view)
 
-    for pos, sym, idx in zip(distribute_workload(atoms.get_positions(), n_workers),
-                        distribute_workload(atoms.get_chemical_symbols(), n_workers),
-                        distribute_workload(np.arange(len(atoms)).astype(int), n_workers)):
+    for pos, sym in zip(atoms.get_positions(), atoms.get_chemical_symbols()):
+        rel_basis = {} #relevant basis entries
+        for b in basis:
+            if sym.lower() == b.lower()[-1]:
+                rel_basis[b] = basis[b]
+        if len(rel_basis) == 0: continue   # Skip atoms for which no basis provided
 
-        density_list.append([])
-        pos_list.append([])
-        basis_list.append([])
-        sym_list.append([])
-        indices_list.append([])
-        for p, s, i in zip(pos, sym, idx):
-            if s.lower() not in basis_species: continue   # Skip atoms for which no basis provided
-            mesh = mesh_around(p, basis['r_o_' + s.lower()], density)
-            density_list[-1].append(Density(density.rho[mesh],
+        box = box_around(pos, basis['r_o_' + sym.lower()], density)
+        density_list.append(Density(density.rho[box['mesh']],
                                                 density.unitcell,
                                                 density.grid))
-            pos_list[-1].append(p)
-            sym_list[-1].append(s)
-            basis_list[-1].append(basis)
-            indices_list[-1].append(i)
-    time_setup.stop()
+        pos_list.append(pos)
+        sym_list.append(sym)
+        basis_list.append(rel_basis)
 
-    n_jobs = len(basis_list)
-    all_pos = atoms.get_positions()
+    if orient_mode == 'none':
+        values = view.map_sync(atomic_elf, pos_list, density_list, basis_list, sym_list)
+        elfs = []
+        for v,b,s in zip(values, basis_list, sym_list):
+            elfs.append(ElF(v,[0,0,0],b, s, density.unitcell))
+    else:
+        n_jobs = len(basis_list)
+        all_pos = atoms.get_positions()
+        elfs = view.map_sync(get_elf_oriented_thread, pos_list, density_list,
+          basis_list, sym_list, list(range(n_jobs)),[all_pos]*n_jobs,
+          [orient_mode]*n_jobs)
 
-    elfs = view.map_sync(get_elf_thread, pos_list, density_list,
-      basis_list, sym_list, indices_list,[all_pos]*n_jobs,
-      [orient_mode]*n_jobs)
-
-    time_flatten  = Timer("TIME_FLATTEN_LIST")
-    elfs_flat = []
-
-    max_len = len(elfs[0])
-    for i in range(max_len):
-        for e in elfs:
-            try:
-                elfs_flat.append(e.pop(0))
-            except IndexError:
-                break
-        else:
-            continue
-        break
-
-    time_flatten.stop()
-    time_all.stop()
-    print(len(elfs_flat))
-    return elfs_flat
+    return elfs
 
 def get_elfs_oriented(atoms, density, basis, mode, view = serial_view()):
     """

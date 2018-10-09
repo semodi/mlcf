@@ -1,6 +1,6 @@
 import sys
 import os
-from .timer import Timer
+from mlc_func import Timer
 import time
 import numpy as np
 import pickle
@@ -16,7 +16,8 @@ class FeatureGetter():
 
             def __init__(self):
                 pass
-
+            def __len__(self):
+                return 1
             def map_sync(self, *args):
                 return list(map(*args))
 
