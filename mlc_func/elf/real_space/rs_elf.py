@@ -338,7 +338,6 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
 
     time_flatten.stop()
     time_all.stop()
-    print(len(elfs_flat))
     return elfs_flat
 
 def get_elfs_oriented(atoms, density, basis, mode, view = serial_view()):

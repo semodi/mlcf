@@ -204,7 +204,8 @@ class MLCF_Calculator:
                 prediction = {}
                 time_predict = Timer("TIME_PREDICT")
                 for species in elfs_dict:
-                    prediction[species] = self.force_models[species.lower()].predict(elfs_dict[species])
+                    prediction[species] = self.force_models[species.lower()].predict(elfs_dict[species],
+                     processed = True)
                     for i, (pred, e, a) in enumerate(zip(prediction[species],
                         elfs_dict[species], angles_dict[species])):
 
@@ -306,9 +307,6 @@ def load_mlcf(model_path, client = None):
 
     if not model_path[-1] == '/': model_path += '/'
 
-    with open(model_path +'basis.json','r') as basisfile:
-        basis = json.loads(basisfile.readline())
-
     all_files = os.listdir(model_path)
 
     force_models = [f for f in all_files if 'force_' in f]
@@ -331,11 +329,11 @@ def load_mlcf(model_path, client = None):
     descr_getter = DescriptorGetter(full_basis, client)
 
     masks = {}
-    for s in species:
+    for s in force_models:
         masks[s.lower()] = force_models[s.lower()].mask
 
     scalers = {}
-    for s in species:
+    for s in force_models:
         scalers[s.lower()] = force_models[s.lower()].scaler
 
     descr_getter.set_masks(masks)

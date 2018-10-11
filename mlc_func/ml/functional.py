@@ -11,9 +11,11 @@ from sklearn.kernel_ridge import KernelRidge as KRR
 from sklearn.model_selection import train_test_split, cross_val_score
 from .force_network import Force_Network
 import h5py
+import json
 
 def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
-    automask_std = 0, autofilt_percent = 0, test_size = 0.2, species = ''):
+    automask_std = 0, autofilt_percent = 0, test_size = 0.2, species = '',
+    random_state = 42):
 
     species = species.lower()
     if not len(species) == 1:
@@ -31,13 +33,14 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
                               grouped = True, values_only = True)[species])
         angles = np.array(elf.utils.hdf5_to_elfs(fsrc,
                               grouped = True, angles_only = True)[species])
+
         with h5py.File(fsrc) as file:
-            this_basis = file.attrs['basis']
+            this_basis = json.loads(file.attrs['basis'])
             # Filter for species
             species_basis = {}
             for entry in this_basis:
-                if this_basis[entry][-1] == species or\
-                 this_basis[entry] == 'alignment':
+                if entry[-1] == species or\
+                 entry == 'alignment':
                  species_basis[entry] = this_basis[entry]
 
             if len(basis) > 0 and species_basis != basis:
@@ -50,7 +53,7 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
         elfs = elfs.reshape(-1,elfs.shape[-1])
         targets = np.genfromtxt(tsrc, delimiter = ',', dtype=str)
         targets = targets[targets[:,3] == species, :3].astype(float)
-
+        print(elfs.shape)
         for idx, (t, ang) in enumerate(zip(targets, angles)):
             targets[idx] = elf.geom.rotate_vector(np.array([t]),ang.tolist(), inverse=True)
 
@@ -68,7 +71,7 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
 
             filter = [s1 & s2 & s3 for s1,s2,s3 in zip(*selection)]
 
-        if len(mask) != len(elfs):
+        if len(mask) != elfs.shape[-1]:
             feat = np.array(elfs)
             mask = (np.std(feat.reshape(-1,feat.shape[-1]),
                         axis = 0) > automask_std)
@@ -85,14 +88,14 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
     X_train, X_test, y_train, y_test = train_test_split(feat,
                                                     targets,
                                                     shuffle =True,
-                                                    random_state = 42,
+                                                    random_state = random_state,
                                                     test_size = test_size)
 
     X_train, X_valid, y_train, y_valid = train_test_split(X_train,
                                                           y_train,
                                                           shuffle =True,
-                                                          random_state = 42,
-                                                          test_size = test_size)
+                                                          random_state = random_state,
+                                                          test_size = 0.2)
     datasets = {
         'X_train': X_train,
         'X_test': X_test,
@@ -133,7 +136,6 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
         for species in elfs:
             feat = np.array(elfs[species])[:,:,masks[species]]
             feat = feat[filter]
-            print(feat.shape)
             for j in range(feat.shape[1]):
                 subnets.append(Subnet())
                 subnets[-1].add_dataset(Dataset(feat[:,j:j+1], species),
