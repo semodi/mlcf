@@ -121,7 +121,6 @@ workdir/
 h2o.*
 __pycache__/
 *.swp
-siesta/
 *egg-info/
 .ipynb_checkpoints/
 TIME*

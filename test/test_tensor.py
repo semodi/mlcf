@@ -2,10 +2,10 @@ import pytest
 import unittest
 import os
 import pickle
-import elf.siesta as siesta
-from elf.geom import make_real, rotate_tensor, get_nncs_angles,\
+import mlc_func.elf.siesta as siesta
+from mlc_func.elf.geom import make_real, rotate_tensor, get_nncs_angles,\
  get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector, fold_back_coords
-from elf.real_space import Density, get_elfs, orient_elfs
+from mlc_func.elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
 import numpy as np
 

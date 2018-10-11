@@ -19,7 +19,7 @@ import mlc_func.elf as elf
 import json
 import subprocess
 from .read_input import read_input
-
+from elf.ml import load_force_model
 
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -309,23 +309,27 @@ def load_mlcf(model_path, client = None):
     with open(model_path +'basis.json','r') as basisfile:
         basis = json.loads(basisfile.readline())
 
-    descr_getter = DescriptorGetter(basis, client)
     all_files = os.listdir(model_path)
+
     force_models = [f for f in all_files if 'force_' in f]
     species = [f[-1] for f in force_models]
-    force_models = {s.lower(): keras.models.load_model(model_path + fm)\
-        for s, fm in zip(species, force_models)}
-    try:
-        scalers = {s.lower(): pickle.load(open(model_path + 'scaler_' + s,'rb')) for s in species}
-    except FileNotFoundError:
-        raise Exception('Must provide one scaler for each force model')
+
+    force_models = {s.lower(): load_force_model(model_path, s.lower())\
+        for s in species}
+
+    # Check basis integrity across models
+
+    basis_old = {}
+    for 
+    descr_getter = DescriptorGetter(basis, client)
 
     masks = {}
     for s in species:
-        try:
-            masks[s.lower()] = np.genfromtxt(model_path + 'mask_' + s,dtype=bool)
-        except FileNotFoundError:
-            pass # if not mask found it is assumed that all features are used
+        masks[s.lower()] = force_models[s.lower()].mask
+
+    scalers = {}
+    for s in species:
+        scalers[s.lower()] = force_models[s.lower()].scaler
 
     descr_getter.set_masks(masks)
     descr_getter.set_scalers(scalers)
