@@ -33,10 +33,17 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
                               grouped = True, angles_only = True)[species])
         with h5py.File(fsrc) as file:
             this_basis = file.attrs['basis']
-            if len(basis) > 0 and this_basis != basis:
+            # Filter for species
+            species_basis = {}
+            for entry in this_basis:
+                if this_basis[entry][-1] == species or\
+                 this_basis[entry] == 'alignment':
+                 species_basis[entry] = this_basis[entry]
+
+            if len(basis) > 0 and species_basis != basis:
                 raise Exception('Basis used across datasets not consistent')
             else:
-                basis = this_basis
+                basis = species_basis
 
         angles = angles.reshape(-1,3)
 

@@ -19,7 +19,7 @@ import mlc_func.elf as elf
 import json
 import subprocess
 from .read_input import read_input
-from elf.ml import load_force_model
+from mlc_func.ml import load_force_model
 
 
 basis_sets = {'o_basis_qz_custom' : """ 3
@@ -317,11 +317,18 @@ def load_mlcf(model_path, client = None):
     force_models = {s.lower(): load_force_model(model_path, s.lower())\
         for s in species}
 
-    # Check basis integrity across models
+    # Out of the element specific basis sets construct the full basis
+    full_basis = {}
+    for species in force_models:
+        for entry in force_models[species].basis:
+            if entry in full_basis and\
+             full_basis[entry] != force_models[species].basis[entry]:
+                raise Exception('Conflicting basis sets across force models')
+            else:
+                full_basis[entry] = force_models[species].basis[entry]
 
-    basis_old = {}
-    for 
-    descr_getter = DescriptorGetter(basis, client)
+
+    descr_getter = DescriptorGetter(full_basis, client)
 
     masks = {}
     for s in species:
