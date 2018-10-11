@@ -8,16 +8,9 @@ from .elf import ElF
 import ipyparallel as ipp
 import re
 import pandas as pd
-
-class serial_view():
-    def __init__(self):
-        pass
-
-    def __len__(self):
-        return 1
-
-    def map_sync(self, *args):
-        return list(map(*args))
+from mlc_func.elf.siesta import get_density, get_density_bin, get_atoms, get_forces, get_energy
+from mlc_func.elf.real_space import get_elfs_oriented
+from .serial_view import serial_view
 
 def get_view(profile = 'default'):
     client = ipp.Client()
@@ -27,12 +20,11 @@ def get_view(profile = 'default'):
     return view
 
 def __get_elfs(path, atoms, basis, method):
-    # density = elf.siesta.get_density_bin(path)
     try:
-        density = elf.siesta.get_density(path)
+        density = get_density(path)
     except UnicodeDecodeError:
-        density = elf.siesta.get_density_bin(path)
-    return elf.real_space.get_elfs_oriented(atoms, density, basis, method)
+        density = get_density_bin(path)
+    return get_elfs_oriented(atoms, density, basis, method)
 
 def atoi(text):
     return int(text) if text.isdigit() else text
@@ -62,12 +54,12 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     print(paths)
     print('{} systems found. Processing ...'.format(len(paths)))
 
-    atoms = view.map_sync(elf.siesta.get_atoms,[p + '.' + add_ext for p in paths])
+    atoms = view.map_sync(get_atoms,[p + '.' + add_ext for p in paths])
     elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
      atoms, [basis]*len(atoms), [method]*len(atoms))
 
-    forces = view.map_sync(elf.siesta.get_forces, [p + '.' + add_ext for p in paths])
-    energies = view.map_sync(elf.siesta.get_energy, [p + '.' + add_ext for p in paths])
+    forces = view.map_sync(get_forces, [p + '.' + add_ext for p in paths])
+    energies = view.map_sync(get_energy, [p + '.' + add_ext for p in paths])
     forces = np.array(forces).reshape(-1,3)
     energies = np.array(energies).flatten()
 

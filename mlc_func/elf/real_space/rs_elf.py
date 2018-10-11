@@ -11,7 +11,7 @@ from ase.units import Bohr
 from mlc_func.elf.geom import get_nncs_angles, get_elfcs_angles
 from mlc_func.elf.geom import make_real, rotate_tensor, fold_back_coords
 from mlc_func.elf import ElF
-from mlc_func.elf.utils import serial_view
+from mlc_func.elf.serial_view import serial_view
 from mlc_func import Timer
 
 def mesh_around(pos, radius, density, unit = 'A'):
