@@ -12,9 +12,13 @@ from mlc_func.elf.siesta import get_density, get_density_bin, get_atoms, get_for
 from mlc_func.elf.real_space import get_elfs_oriented
 from .serial_view import serial_view
 
-def get_view(profile = 'default'):
+def get_view(profile = 'default', n = -1):
     client = ipp.Client()
-    view = client.load_balanced_view()
+    # view = client.load_balanced_view()
+    if n == -1:
+        view = client[:]
+    else:
+        view = client[:n]
     print('Clients operating : {}'.format(len(client.ids)))
     n_clients = len(client.ids)
     return view
@@ -25,6 +29,17 @@ def __get_elfs(path, atoms, basis, method):
     except UnicodeDecodeError:
         density = get_density_bin(path)
     return get_elfs_oriented(atoms, density, basis, method)
+
+
+def __get_all(paths, method, basis, add_ext, dens_ext):
+    atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths]))
+    elfs = list(map(__get_elfs, [p + '.' + dens_ext for p in paths],
+     atoms, [basis]*len(paths), [method]*len(paths)))
+
+    forces = list(map(get_forces, [p + '.' + add_ext for p in paths]))
+    energies = list(map(get_energy, [p + '.' + add_ext for p in paths]))
+
+    return atoms, elfs, forces, energies
 
 def atoi(text):
     return int(text) if text.isdigit() else text
@@ -38,6 +53,8 @@ def natural_keys(text):
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
     add_ext = 'out', method = 'elf', view = serial_view()):
 
+
+    if root[-1] == '/': root = root[:-1]
     if root[0] != '/' and root[0] != '~':
         root = os.getcwd() + '/' + root
     paths = []
@@ -54,15 +71,32 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     print(paths)
     print('{} systems found. Processing ...'.format(len(paths)))
 
-    atoms = view.map_sync(get_atoms,[p + '.' + add_ext for p in paths])
-    elfs = view.map_sync(__get_elfs,[p + '.' + dens_ext for p in paths],
-     atoms, [basis]*len(atoms), [method]*len(atoms))
+    n_workers = len(view)
+    full_workload = len(paths)
 
-    forces = view.map_sync(get_forces, [p + '.' + add_ext for p in paths])
-    energies = view.map_sync(get_energy, [p + '.' + add_ext for p in paths])
+    min_workload = np.floor(full_workload/n_workers).astype(int)
+    max_workload = min_workload + 1
+    n_max_workers = full_workload - min_workload*n_workers
+
+
+    paths_dist = [paths[i*(max_workload):(i+1)*(max_workload)] for i in range(n_max_workers)]
+
+    offset = n_max_workers*max_workload
+
+    paths_dist += [paths[offset + i*min_workload:offset + (i+1) * min_workload] for i in range(n_workers - n_max_workers)]
+
+    all_results = list(view.map(__get_all,
+     paths_dist, [method]*len(paths_dist), [basis]*len(paths_dist),
+      [add_ext]*len(paths_dist), [dens_ext]*len(paths_dist)))
+    atoms, elfs, forces, energies = list(map(list, zip(*all_results)))
+
+    forces = [e for sublist in forces for e in sublist]
+    energies = [e for sublist in energies for e in sublist]
     forces = np.array(forces).reshape(-1,3)
     energies = np.array(energies).flatten()
 
+    elfs = [e for sublist in elfs for e in sublist]
+    atoms = [a for sublist in atoms for a in sublist]
     name = root.split('/')[-1]
     elfs_to_hdf5(elfs, name + '_processed.hdf5')
     write(name +'.traj', atoms)
