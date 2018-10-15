@@ -20,6 +20,7 @@ import json
 import subprocess
 from .read_input import read_input
 from mlc_func.ml import load_force_model
+from .mixer import Mixer
 
 
 basis_sets = {'o_basis_qz_custom' : """ 3
