@@ -103,7 +103,7 @@ def get_energy(path, keywords=['Total']):
 
     return values
 
-def get_forces(path):
+def get_forces(path, n_atoms = -1):
     """find forces in siesta .out file
     """
     with open(path, 'r') as infile:
@@ -119,10 +119,14 @@ def get_forces(path):
             if i%5 ==0: continue
             if f =='siesta:': continue
             forces.append(float(f))
-    return np.array(forces).reshape(-1,3)
+    forces = np.array(forces).reshape(-1,3)
+    if n_atoms == -1:
+        return forces
+    else:
+        return forces[:n_atoms]
 
 
-def get_atoms(path):
+def get_atoms(path, n_atoms = -1):
     """find atomic data in siesta .out file and return as ase Atoms object
     """
     def find_coords(path):
@@ -167,6 +171,9 @@ def get_atoms(path):
     coords = find_coords(path)
     for c in coords:
         atom_string += chem_species[int(c[3])]
+    if n_atoms == -1: n_atoms = len(atom_string) 
+    atom_string = atom_string[:n_atoms]
+    coords = coords[:n_atoms]
     atoms = Atoms(atom_string, positions = coords[:,:3])
     atoms.set_pbc(True)
     atoms.set_cell(find_unit_cell(path))

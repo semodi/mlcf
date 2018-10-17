@@ -13,7 +13,7 @@ from mlc_func.elf.real_space import get_elfs_oriented
 from .serial_view import serial_view
 
 def get_view(profile = 'default', n = -1):
-    client = ipp.Client()
+    client = ipp.Client(profile = profile)
     # view = client.load_balanced_view()
     if n == -1:
         view = client[:]
@@ -31,12 +31,14 @@ def __get_elfs(path, atoms, basis, method):
     return get_elfs_oriented(atoms, density, basis, method)
 
 
-def __get_all(paths, method, basis, add_ext, dens_ext):
-    atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths]))
+def __get_all(paths, method, basis, add_ext, dens_ext, n_atoms):
+
+    
+    atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths],[n_atoms]*len(paths)))
     elfs = list(map(__get_elfs, [p + '.' + dens_ext for p in paths],
      atoms, [basis]*len(paths), [method]*len(paths)))
 
-    forces = list(map(get_forces, [p + '.' + add_ext for p in paths]))
+    forces = list(map(get_forces, [p + '.' + add_ext for p in paths],[n_atoms]*len(paths)))
     energies = list(map(get_energy, [p + '.' + add_ext for p in paths]))
 
     return atoms, elfs, forces, energies
@@ -51,7 +53,7 @@ def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
-    add_ext = 'out', method = 'elf', view = serial_view()):
+    add_ext = 'out', method = 'elf', view = serial_view(), n_atoms = -1):
 
 
     if root[-1] == '/': root = root[:-1]
@@ -87,7 +89,7 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
 
     all_results = list(view.map(__get_all,
      paths_dist, [method]*len(paths_dist), [basis]*len(paths_dist),
-      [add_ext]*len(paths_dist), [dens_ext]*len(paths_dist)))
+      [add_ext]*len(paths_dist), [dens_ext]*len(paths_dist), [n_atoms]*len(paths_dist)))
     atoms, elfs, forces, energies = list(map(list, zip(*all_results)))
 
     forces = [e for sublist in forces for e in sublist]
