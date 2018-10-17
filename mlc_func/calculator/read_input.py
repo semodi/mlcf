@@ -24,7 +24,7 @@ def read_input(input_file):
         line = file.readline()
         while(line):
 
-            if line == '':
+            if line == '' or line[0] == '#':
                 line = file.readline()
                 continue
 

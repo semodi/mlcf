@@ -12,10 +12,35 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from .force_network import Force_Network
 import h5py
 import json
+from ase.io import read
 
-def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
-    automask_std = 0, autofilt_percent = 0, test_size = 0.2, species = '',
+#TODO: would it make more sense to save forces in xyz-style file ?
+
+def build_force_mlcf(feature_src, target_src, traj_src, species, mask = [], filters = [],
+    automask_std = 0, autofilt_percent = 0, test_size = 0.2,
     random_state = 42):
+    ''' Return a trainable force MLCF (neural network)
+
+    Parameters:
+    ----------
+
+    feature_src: list; list of paths to the hdf5 containing the features
+    target_src: list; list of paths to the csv files containing the target forces
+                entries in target_scr and feature_src correspond to each other
+    traj_src: list; list of paths to the .traj/.xyz files (needed to determine species
+                of each atom)
+    species: string; containing the species that model should be fitted for
+    mask: list containing booleans; can be used to select which features to use.
+        default: use all features
+    filters: list containing list of booleans; can be used to exclude datapoints
+        in sets (e.g. outliers)
+    automask_std: float, if mask not set exclude all features whose stdev across dataset
+        is smaller than this value
+    autofilt_percent: float, exclude this percentile of extreme datapoints from set
+            (only if filters not set)
+    test_size: float, relative size of hold_out (test) set
+    random_state: int, state used to perform shuffle before spliting dataset
+    '''
 
     species = species.lower()
     if not len(species) == 1:
@@ -28,7 +53,7 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
 
     basis = {}
 
-    for fsrc, tsrc, filter in zip(feature_src, target_src, filters):
+    for fsrc, tsrc, trsrc, filter in zip(feature_src, target_src, traj_src, filters):
         elfs = np.array(elf.utils.hdf5_to_elfs(fsrc,
                               grouped = True, values_only = True)[species])
         angles = np.array(elf.utils.hdf5_to_elfs(fsrc,
@@ -51,8 +76,14 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
         angles = angles.reshape(-1,3)
 
         elfs = elfs.reshape(-1,elfs.shape[-1])
-        targets = np.genfromtxt(tsrc, delimiter = ',', dtype=str)
-        targets = targets[targets[:,3] == species, :3].astype(float)
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+        if not trsrc.split('.')[-1] in ['xyz', 'traj']:
+            raise Exception('Invalid file format for trajectory file stored at {}'.format(trsrc))
+        traj = read(trsrc, ':')
+
+        all_symbols = np.array([t.get_chemical_symbols() for t in traj]).flatten()
+        targets = targets[all_symbols == species.upper()]
+
         print(elfs.shape)
         for idx, (t, ang) in enumerate(zip(targets, angles)):
             targets[idx] = elf.geom.rotate_vector(np.array([t]),ang.tolist(), inverse=True)
@@ -108,6 +139,26 @@ def build_force_mlcf(feature_src, target_src, mask = [], filters = [],
 
 def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
     filters = [], test_size = 0.2):
+
+    ''' Return a trainable energy MLCF (neural network)
+
+    Parameters:
+    ----------
+
+    feature_src: list; list of paths to the hdf5 containing the features
+    target_src: list; list of paths to the csv files containing the target energies
+                entries in target_scr and feature_src correspond to each other
+    masks: dict containing list booleans; can be used to select which features to use.
+        keys specify the atomic species.
+        default: use all features
+    automask_std: float, if mask not set exclude all features whose stdev across dataset
+        is smaller than this value
+
+    filters: list containing list of booleans; can be used to exclude datapoints
+        in sets (e.g. outliers)
+
+    test_size: float, relative size of hold_out (test) set
+    '''
 
     if not len(feature_src) == len(target_src):
         raise Exception('Please provided only one target location for each feature set')

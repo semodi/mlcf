@@ -130,9 +130,12 @@ class Force_Network():
               Max. abs. error = {:5.4f}'.format(rmse, mae, max))
         if plot:
             plt.figure()
-            plt.plot(y, prediction, ls = '', marker = '.')
+            for i, l in enumerate(['x','y','z']):
+                plt.plot(y[:,i], prediction[:,i], ls = '', marker = '.',
+                 label = l)
             plt.xlabel('Expected')
             plt.ylabel('Predicted')
+            plt.legend()
             plt.show()
 
         return {'rmse' : rmse, 'mae': mae, 'max': max}
