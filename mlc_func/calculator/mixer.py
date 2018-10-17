@@ -21,27 +21,34 @@ class Mixer(Siesta):
         self.forces = 0
 
     def get_potential_energy(self, atoms, force_consistent = False):
+        calc_required = \
+         self.fast_calculator.calculation_required(atoms, ['energy'])
 
-        f_fast = self.fast_calculator.get_forces(atoms)
-        if self.step%self.n == 0:
-            shutil.copy('H2O.DM','DM_save/DM.fast')
-            try:
-                shutil.copy('DM_save/DM.slow', 'H2O.DM')
-            except FileNotFoundError:
-                pass
+        if calc_required:
+            f_fast = self.fast_calculator.get_forces(atoms)
+            if self.step%self.n == 0:
+                shutil.copy('H2O.DM','DM_save/DM.fast')
+                try:
+                    shutil.copy('DM_save/DM.slow', 'H2O.DM')
+                except FileNotFoundError:
+                    pass
 
-            f_slow = self.slow_calculator.get_forces(atoms)
-            self.forces = f_fast + self.n * (f_slow - f_fast)
+                f_slow = self.slow_calculator.get_forces(atoms)
+                self.forces = f_fast + self.n * (f_slow - f_fast)
 
-            with open('forces_mixing.dat', 'a') as file:
-                np.savetxt(file, f_slow - f_fast, fmt = '%.4f')
+                with open('forces_mixing.dat', 'a') as file:
+                    np.savetxt(file, f_slow - f_fast, fmt = '%.4f')
 
-            shutil.copy('H2O.DM','DM_save/DM.slow')
-            shutil.copy('DM_save/DM.fast', 'H2O.DM')
-            return self.slow_calculator.get_potential_energy(atoms)
-        else:
-            self.forces = f_fast
-            return self.fast_calculator.get_potential_energy(atoms)
+                shutil.copy('H2O.DM','DM_save/DM.slow')
+                shutil.copy('DM_save/DM.fast', 'H2O.DM')
+                self.energy = self.slow_calculator.get_potential_energy(atoms)
+            else:
+                self.forces = f_fast
+                self.energy = self.fast_calculator.get_potential_energy(atoms)
+
+            self.step += 1
+
+        return self.energy
 
     def increment_step(self):
         self.step += 1

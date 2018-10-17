@@ -8,4 +8,5 @@ class serial_view():
     def map_sync(self, *args):
         return list(map(*args))
 
-
+    def map(self, *args):
+        return list(map(*args))
