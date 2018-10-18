@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+import mlc_func as mlcf
+import os
+from ase import Atoms
+from ase.md.npt import NPT
+from ase.md import VelocityVerlet
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+from ase.io import read,write, Trajectory
+from ase import io
+from ase import units as ase_units
+from ase.md import logger
+import numpy as np
+import shutil
+import argparse
+try:
+    from mbpol_calculator import MbpolCalculator
+    MBPOL_AVAIL = True
+except ImportError:
+    MBPOL_AVAIL = False
+
+os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Run a molecular dynamics simulation using MLCF calculators')
+    parser.add_argument('startfile', action='store', help ='Path to .xyz/.traj file containing starting configuration')
+    parser.add_argument('calcfile', action='store', help='Path to .inp file defining the calculator')
+    parser.add_argument('name', action='store', help='Name of this run')
+    parser.add_argument('-integrator', metavar='integrator', type=str, default='VV', nargs = '?', help ='Integrator: Choose VV (Velocity Verlet, default) or NH (Nose-Hoover)')
+    parser.add_argument('-T', metavar='T', type=float, nargs = '?', default=300.0, help ='Temperature in Kelvin')
+    parser.add_argument('-dt', metavar='dt', type=float, nargs = '?', default=1.0, help='Timestep in fs')
+    parser.add_argument('-Nt', metavar='Nt', type=int, nargs = '?', default=1e6, help='Number of timesteps')
+    parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./', help='Save in directory')
+    parser.add_argument('-ttime', metavar='ttime', type=int, nargs= '?', default=10, help='ttime for NH thermostat')
+    parser.add_argument('-restart', action=('store_true'), help='Restart last calculation')
+    parser.add_argument('-np', metavar='np', type=int, nargs = '?', default=1, help='Number of mpi processes')
+    parser.add_argument('-pseudoloc', metavar='pseudoloc', type=str, nargs = '?', default='./', help='Location of pseudopotentials')
+
+
+    args = parser.parse_args()
+    ttime = args.ttime
+    if args.np > 1:
+        os.environ['SIESTA_COMMAND'] = 'mpirun -np {} siesta < ./%s > ./%s'.format(args.np)
+    os.environ['SIESTA_PP_PATH'] = args.pseudoloc
+    args.Nt = int(args.Nt)
+    # Load initial configuration
+    if not args.dir[-1] =='/': args.dir += '/'
+    if args.restart:
+        atoms = read(args.dir + args.name + '.traj')
+    else:
+        atoms = read(args.startfile)
+        MaxwellBoltzmannDistribution(atoms, args.T * ase_units.kB)
+        print('ttime= {} fs :: temperature = {}'.format(args.ttime, atoms.get_temperature()))
+        atoms.set_momenta(atoms.get_momenta() - np.mean(atoms.get_momenta(), axis =0))
+
+    calcdir = os.getcwd()
+    try:
+        shutil.os.mkdir(args.dir)
+    except FileExistsError:
+        pass
+    os.chdir(args.dir)
+
+    try:
+        shutil.os.mkdir('siesta/')
+    except FileExistsError:
+        pass
+    os.chdir('siesta/')
+
+
+    calculator = mlcf.calculator.load_from_file(calcdir + '/' + args.calcfile)
+    traj = io.Trajectory('../' + args.name  + '.traj',
+                         mode = 'a', atoms = atoms)
+
+    if isinstance(calculator, mlcf.calculator.Mixer):
+        if isinstance(calculator.fast_calculator, MbpolCalculator):
+            calculator.fast_calculator = MbpolCalculator(atoms)
+        if isinstance(calculator.slow_calculator, MbpolCalculator):
+            calculator.slow_calculator = MbpolCalculator(atoms)
+    elif isinstance(calculator, MbpolCalculator):
+        calculator = MbpolCalculator(atoms)
+
+    atoms.calc = calculator
+
+    if args.integrator.lower() == 'nh':
+        dyn = NPT(atoms, timestep = args.dt * ase_units.fs,
+                  temperature =  args.T * ase_units.kB, externalstress = 0,
+                  ttime = args.ttime * ase_units.fs, pfactor = None,
+                             trajectory=traj,
+                             logfile= '../'+ args.name + '.log')
+    elif args.integrator.lower() == 'vv':
+        dyn = VelocityVerlet(atoms, dt = args.dt * ase_units.fs,
+                             trajectory=traj,
+                             logfile='../'+ args.name + '.log')
+    else:
+        raise Exception('Unknown integrator')
+
+    dyn.run(args.Nt)

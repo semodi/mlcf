@@ -93,6 +93,9 @@ class Force_Network():
         last_train = 1e8
         last_valid = 1e8
         for i in range(int(max_epochs/epochs_per_output)):
+            print('--------Epoch = {}----------'.format(i*epochs_per_output))
+            print('Training loss || Validation loss')
+            print( '{:13.6f} || {:13.6f}'.format(train_loss, valid_loss))
             self.model.fit(self.X_train, self.y_train, epochs=epochs_per_output,
              batch_size=batch_size, verbose=0)
             train_loss = np.sqrt(self.model.evaluate(self.X_train, self.y_train, verbose = 0)[0])
@@ -102,9 +105,6 @@ class Force_Network():
             else:
                 last_train = train_loss
                 last_valid = valid_loss
-            print('--------Epoch = {}----------'.format(i*epochs_per_output))
-            print('Training loss || Validation loss')
-            print( '{:13.6f} || {:13.6f}'.format(train_loss, valid_loss))
 
 
     def predict(self, feat, processed = False):

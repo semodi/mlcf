@@ -8,10 +8,16 @@ try:
     from ase.calculators.siesta.parameters import Species
 except ImportError:
     from ase.calculators.siesta.parameters import Specie as Species #fix
+try:
+    from mbpol_calculator import MbpolCalculator
+    MBPOL_AVAIL = True
+except ImportError:
+    MBPOL_AVAIL = False
 
 from ase.calculators.siesta.parameters import PAOBasisBlock
 from ase.units import Ry
 from ase.io import Trajectory
+from ase import Atoms
 import numpy as np
 import pickle
 import ipyparallel as ipp
@@ -276,8 +282,17 @@ def load_from_file(input_file):
 
     for i in iterate_over:
         model_path = settings_choice['model' + i]
+        if 'mbpol' in  model_path.lower():
+            if MBPOL_AVAIL:
+                dummy_atoms = Atoms('OHH',positions = [[0,0,0],[-0.76,0.59,0],[0.76,0.59,0]])
+                base_calculator = MbpolCalculator(dummy_atoms)
+                calculators.append(base_calculator)
+                continue
+            else:
+                raise Exception('module for MbpolCalculator not available')
+
         base_calculator = Siesta_Calculator(basis= settings_choice['basis' + i],
-                                xc= settings_choice['xcfunctional' + i].upper())
+                                xc = settings_choice['xcfunctional' + i].upper())
         base_calculator.set_solution_method(settings_choice['solutionmethod' + i])
 
         if  model_path != None:
