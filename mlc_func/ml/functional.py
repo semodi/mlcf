@@ -54,11 +54,13 @@ def build_force_mlcf(feature_src, target_src, traj_src, species, mask = [], filt
     basis = {}
 
     for fsrc, tsrc, trsrc, filter in zip(feature_src, target_src, traj_src, filters):
-        elfs = np.array(elf.utils.hdf5_to_elfs(fsrc,
-                              grouped = True, values_only = True)[species])
-        angles = np.array(elf.utils.hdf5_to_elfs(fsrc,
-                              grouped = True, angles_only = True)[species])
-
+        # elfs = np.array(elf.utils.hdf5_to_elfs(fsrc,
+        #                       grouped = True, values_only = True)[species])
+        # angles = np.array(elf.utils.hdf5_to_elfs(fsrc,
+        #                       grouped = True, angles_only = True)[species])
+        elfs, angles = elf.utils.hdf5_to_elfs_fast(fsrc, species)
+        elfs = elfs[species]
+        angles = angles[species]
         with h5py.File(fsrc) as file:
             this_basis = json.loads(file.attrs['basis'])
             # Filter for species
@@ -169,8 +171,7 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
 
     no_mask = False
     for fsrc, tsrc, filter in zip(feature_src, target_src, filters):
-        elfs = elf.utils.hdf5_to_elfs(fsrc,
-                              grouped = True, values_only = True)
+        elfs, _ = elf.utils.hdf5_to_elfs_fast(fsrc)
 
         targets = np.genfromtxt(tsrc, delimiter = ',')
         if not isinstance(filter, list) and not isinstance(filter, np.ndarray):

@@ -33,7 +33,7 @@ def __get_elfs(path, atoms, basis, method):
 
 def __get_all(paths, method, basis, add_ext, dens_ext, n_atoms):
 
-    
+
     atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths],[n_atoms]*len(paths)))
     elfs = list(map(__get_elfs, [p + '.' + dens_ext for p in paths],
      atoms, [basis]*len(paths), [method]*len(paths)))
@@ -157,7 +157,7 @@ def hdf5_to_elfs(path, species_filter = '', grouped = False,
     print(basis)
     if values_only and angles_only:
         raise Exception('Cannot return values and angles only at the same time')
-    if values_only:
+    if values_only or angles_only:
         grouped = True
 
     if grouped:
@@ -170,11 +170,11 @@ def hdf5_to_elfs(path, species_filter = '', grouped = False,
     else:
         current_system = -1
 
-    for value, length, species, angles, system in zip(file['value'],
-                                                  file['length'],
-                                                  file['species'],
-                                                  file['angles'],
-                                                  file['system']):
+    for value, length, species, angles, system in zip(file['value'][:],
+                                                  file['length'][:],
+                                                  file['species'][:],
+                                                  file['angles'][:],
+                                                  file['system'][:]):
         species = species.astype(str).lower()
         if len(species_filter) > 0 and\
          (not (species in species_filter.lower())):
@@ -206,3 +206,32 @@ def hdf5_to_elfs(path, species_filter = '', grouped = False,
     if grouped:
         elfs = elfs_grouped
     return elfs
+
+def hdf5_to_elfs_fast(path, species_filter = ''):
+
+        file = h5py.File(path, 'r')
+        basis = json.loads(file.attrs['basis'])
+        print(basis)
+
+        values_dict = {}
+        angles_dict = {}
+        values = file['value'][:]
+        angles = file['angles'][:]
+        all_species = file['species'][:]
+        all_lengths = file['length'][:]
+        systems = file['system'][:]
+        unique_systems, count_system = np.unique(systems,return_counts=True)
+        if not len(np.unique(count_system)) == 1:
+            raise Exception('Dataset not homogeneous')
+        else:
+            n_systems = len(unique_systems)
+        if len(species_filter) == 0:
+            species_filter = [s.astype(str).lower() for s in np.unique(all_species)]
+
+        for species in species_filter:
+            filt = (all_species.astype(str) == species.upper())
+            length = all_lengths[np.where(filt)[0][0]]
+            values_dict[species] = values[filt,:length].reshape(n_systems,-1,length)
+            angles_dict[species] = angles[filt,:].reshape(n_systems,-1,3)
+
+        return values_dict, angles_dict
