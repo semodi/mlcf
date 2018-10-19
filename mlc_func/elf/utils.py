@@ -1,15 +1,17 @@
 import h5py
+from h5py import File
 import json
 import numpy as np
 from ase import Atoms
-from ase.io import write
+from ase.io import read, write
 import os
 from .elf import ElF
 import ipyparallel as ipp
 import re
 import pandas as pd
 from mlc_func.elf.siesta import get_density, get_density_bin, get_atoms, get_forces, get_energy
-from mlc_func.elf.real_space import get_elfs_oriented
+from mlc_func.elf.real_space import get_elfs_oriented, orient_elfs
+from mlc_func.elf.geom import make_complex, rotate_tensor
 from .serial_view import serial_view
 
 def get_view(profile = 'default', n = -1):
@@ -222,7 +224,7 @@ def hdf5_to_elfs_fast(path, species_filter = ''):
         systems = file['system'][:]
         unique_systems, count_system = np.unique(systems,return_counts=True)
         if not len(np.unique(count_system)) == 1:
-            raise Exception('Dataset not homogeneous')
+            raise Exception('Dataset not homogeneous, use hdf5_to_elfs() instead')
         else:
             n_systems = len(unique_systems)
         if len(species_filter) == 0:
@@ -235,3 +237,32 @@ def hdf5_to_elfs_fast(path, species_filter = ''):
             angles_dict[species] = angles[filt,:].reshape(n_systems,-1,3)
 
         return values_dict, angles_dict
+
+def change_alignment(path, traj_path, new_method, save_as = None):
+    elfs = hdf5_to_elfs(path)
+    atoms = read(traj_path, ':')
+
+    with File(path) as file:
+        basis = json.loads(file.attrs['basis'])
+
+    if new_method == basis['alignment']:
+        raise Exception('Already aligned with method: ' + new_method)
+
+    #Rotate to neutral
+    for i, elf_system in enumerate(elfs):
+        for j, elf in enumerate(elf_system):
+            elfs[i][j].value = rotate_tensor(make_complex(elf.value, basis['n_rad_' + elf.species.lower()],
+                                                       basis['n_l_' + elf.species.lower()]), elf.angles,
+                                             inverse = False)
+            elfs[i][j].angles = np.array([0,0,0])
+            elfs[i][j].unitcell = atoms[i].get_cell()
+
+    oriented_elfs = []
+
+    for elfs_system, atoms_system in zip(elfs, atoms):
+        oriented_elfs.append(orient_elfs(elfs_system,atoms_system,new_method))
+
+    if save_as == None:
+        return oriented_elfs
+    else:
+        elfs_to_hdf5(oriented_elfs, path)
