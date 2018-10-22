@@ -26,7 +26,7 @@ def get_max(tensor):
 
 def make_real(tensor):
     """
-    Take complex tensors tensor provided as a dict and convert them into
+    Take complex tensors provided as a dict and convert them into
     real tensors
     """
     tensor_real = []
@@ -40,6 +40,27 @@ def make_real(tensor):
                 tensor_real.append((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,-m)]+(-1)**m*tensor['{},{},{}'.format(n,l,m)])).real)
 
     return np.array(tensor_real)
+
+def make_complex(tensor_array, n_rad, n_l):
+
+    tensor = {}
+    tensor_complex = {}
+    cnt = 0
+    for n in range(n_rad):
+        for l in range(n_l):
+            for m in range(-l,l+1):
+                tensor['{},{},{}'.format(n,l,m)] = tensor_array[cnt]
+                cnt += 1
+
+    for n in range(n_rad):
+        for l in range(n_l):
+            for m in range(-l,0):
+                tensor_complex['{},{},{}'.format(n,l,m)] = ((1/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,-m)]-1j*tensor['{},{},{}'.format(n,l,m)])))
+            tensor_complex['{},{},{}'.format(n,l,0)] = (tensor['{},{},{}'.format(n,l,0)]) + 0j
+            for m in range(1,l+1):
+                tensor_complex['{},{},{}'.format(n,l,m)] = (((-1)**m/np.sqrt(2)*(tensor['{},{},{}'.format(n,l,m)]+1j*tensor['{},{},{}'.format(n,l,-m)])))
+
+    return tensor_complex
 
 def get_casimir(tensor):
     """ Get the casimir element (equiv. to L_2 norm) of a tensor
@@ -159,54 +180,6 @@ def rotate_tensor(tensor, angles, inverse = False):
                 tensor_rotated['{},{},{}'.format(n,l,m)] = t_rotated[l+m]
     return tensor_rotated
 
-
-def tensor_to_P(tensor, wig3j = None):
-    """
-    Transform an arbitray SO(3) tensor into real P which transforms under the irreducible
-    representation with l = 1. Wigner-3j symbols can be provided or calculated on
-    the fly for faster evaluation. If providedn, wig3j should be an array
-    with indexing [l1,l2,m,m1,m2]
-    """
-    P = []
-    n_rad, n_l = get_max(tensor)
-
-    lam = 1
-    # It is faster to pre-evaluate the wigner-3j symbol, even faster if it is passed
-    if not isinstance(wig3j, np.ndarray):
-        wig3j = np.zeros([n_l,n_l,2*n_l+1,2*n_l+1,2*n_l+1])
-        wig3j = wig3j.astype(np.complex128)
-        for l1 in range(n_l):
-            for l2 in range(n_l):
-                for m in range(-lam,lam+1):
-                    for m1 in range(-n_l,n_l+1):
-                        for m2 in range(-n_l,n_l+1):
-                            wig3j[l2,l1,m,m1,m2] = N(wigner_3j(lam,l2,l1,m,m1,m2))
-
-
-    for mu in range(-lam,lam + 1):
-        P.append([])
-        for n1 in range(n_rad):
-            for n2 in range(n_rad):
-                for l1 in range(n_l):
-                    for l2 in range(n_l):
-                        if (l1 + l2)%2 == 0: continue
-                        p = 0
-                        for m in range(-n_l, n_l+1):
-                            wig = wig3j[l2,l1,mu,(m-mu),-m]
-                            if wig != 0:
-                                p += tensor['{},{},{}'.format(n1,l1,m)]*tensor['{},{},{}'.format(n2,l2,m-mu)].conj() *\
-                                  (-1)**m * wig
-                        p *= (-1)**(lam-l2)
-                        P[mu+lam].append(p)
-
-    p_real = []
-    for pi in np.array(P).T:
-        p_real.append((T.dot(pi))[[2,0,1]])
-    P = np.array(p_real).T
-    if not np.allclose(P.imag,np.zeros_like(P)):
-        raise Exception('Ooops, something went wrong. P not purely real.')
-    return P.real.T
-
 def get_elfcs_angles(i, coords, tensor):
     """Use the ElF algorithm to get angles relating global to local CS
     """
@@ -224,23 +197,15 @@ def get_elfcs_angles(i, coords, tensor):
 
     norm = np.linalg.norm
     len_normal = len(p)
-    # In case p-orbitals are not enough, calculate more l=1 tensors
-    # by combining different angular momenta
-#    p_extended = tensor_to_P(tensor)
-#    p = np.concatenate([p, p_extended], axis = 0).astype(float)
-    # p = p_extended
     k = 0
     for k, d in enumerate(p):
         if norm(d) > NORM_THRESHOLD:
-            # print('Axis1 with elf, {}: {}'.format(k, norm(p[k])))
             axis1 = p[k]/norm(p[k])
             break
     for u, d in enumerate(p[k:]):
         # Find another p-orbital (or l=1 tensor) that is not collinear
         # with the first axis
         if norm(d) > NORM_THRESHOLD and 1 - abs(np.dot(axis1,d)/(norm(axis1)*norm(d))) > ANGLE_THRESHOLD:
-            # print('Axis2 with elf, {}, {}: {}'.format(['normal', 'extended'][int(k + u >= len_normal)],
-                    # k+u, norm(d)))
             axis2 = d
             break
     # If everything fails, pick the direction to the nearest atom as

@@ -115,7 +115,6 @@ monomers_rotated*
 *.pdf
 *.eps
 *.csv
-*jupyter/
 workdir/
 *.png
 h2o.*
@@ -130,3 +129,5 @@ H2O*
 *.eps
 force_test/
 md_siesta.traj
+jupyter/*/
+
