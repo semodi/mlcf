@@ -276,7 +276,8 @@ def load_from_file(input_file):
             calculators.append(base_calculator)
 
     if settings['mixing']:
-        calc = Mixer(calculators[0], calculators[1], mixing_settings['n'])
+        calc = Mixer(calculators[0], calculators[1], mixing_settings['n'],
+            mixing_settings['which'])
     else:
         calc = calculators[0]
 

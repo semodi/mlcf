@@ -17,5 +17,6 @@ default_mixing = {'model1': 'None',
                   'solutionmethod2': ['diagon','omm'],
                   'n': 5,
                   'cmcorrection1' : False,
-                  'cmcorrection2' : False
+                  'cmcorrection2' : False,
+                  'which' : ''
                  }

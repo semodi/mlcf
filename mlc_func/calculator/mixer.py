@@ -6,7 +6,7 @@ import numpy as np
 
 class Mixer(Siesta):
 
-    def __init__(self, fast_calculator, slow_calculator, n):
+    def __init__(self, fast_calculator, slow_calculator, n, correct_species = ''):
         try:
             shutil.os.mkdir('DM_save/')
         except FileExistsError:
@@ -19,6 +19,7 @@ class Mixer(Siesta):
         self.step = 1
         self.energy = 0
         self.forces = 0
+        self.correct_species = correct_species
 
     def get_potential_energy(self, atoms, force_consistent = False):
         calc_required = \
@@ -35,6 +36,10 @@ class Mixer(Siesta):
 
                 f_slow = self.slow_calculator.get_forces(atoms)
                 self.forces = f_fast + self.n * (f_slow - f_fast)
+                if len(self.correct_species) > 0:
+                    print('Only mixing ' + self.correct_species)
+                    dont_correct = [s.lower() not in self.correct_species.lower() for s in atoms.get_chemical_symbols()]
+                    self.forces[dont_correct] = f_slow[dont_correct]
 
                 with open('forces_mixing.dat', 'a') as file:
                     np.savetxt(file, f_slow - f_fast, fmt = '%.4f')
