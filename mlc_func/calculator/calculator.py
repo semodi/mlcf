@@ -282,7 +282,7 @@ def load_from_file(input_file):
 
     for i in iterate_over:
         model_path = settings_choice['model' + i]
-        if 'mbpol' in  model_path.lower():
+        if not model_path == None and 'mbpol' in  model_path.lower():
             if MBPOL_AVAIL:
                 dummy_atoms = Atoms('OHH',positions = [[0,0,0],[-0.76,0.59,0],[0.76,0.59,0]])
                 base_calculator = MbpolCalculator(dummy_atoms)

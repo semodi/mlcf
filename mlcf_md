@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('name', action='store', help='Name of this run')
     parser.add_argument('-integrator', metavar='integrator', type=str, default='VV', nargs = '?', help ='Integrator: Choose VV (Velocity Verlet, default) or NH (Nose-Hoover)')
     parser.add_argument('-T', metavar='T', type=float, nargs = '?', default=300.0, help ='Temperature in Kelvin')
-    parser.add_argument('-dt', metavar='dt', type=float, nargs = '?', default=1.0, help='Timestep in fs')
+    parser.add_argument('-dt', metavar='dt', type=float, nargs = '?', default=0.5, help='Timestep in fs')
     parser.add_argument('-Nt', metavar='Nt', type=int, nargs = '?', default=1e6, help='Number of timesteps')
     parser.add_argument('-dir', metavar='dir', type=str, nargs = '?', default='./', help='Save in directory')
     parser.add_argument('-ttime', metavar='ttime', type=int, nargs= '?', default=10, help='ttime for NH thermostat')
