@@ -39,7 +39,7 @@ class Mixer(Siesta):
                 if len(self.correct_species) > 0:
                     print('Only mixing ' + self.correct_species)
                     dont_correct = [s.lower() not in self.correct_species.lower() for s in atoms.get_chemical_symbols()]
-                    self.forces[dont_correct] = f_slow[dont_correct]
+                    self.forces[dont_correct] = f_fast[dont_correct]
 
                 with open('forces_mixing.dat', 'a') as file:
                     np.savetxt(file, f_slow - f_fast, fmt = '%.4f')

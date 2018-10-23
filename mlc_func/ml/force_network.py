@@ -78,7 +78,9 @@ class Force_Network():
               early_stopping = False,
               batch_size = 500,
               epochs_per_output = 500,
-              restart = False):
+              restart = False,
+              tol_train = 0,
+              tol_valid = 0):
 
 
         if not self.compiled or restart:
@@ -98,9 +100,14 @@ class Force_Network():
             valid_loss = np.sqrt(self.model.evaluate(self.X_valid, self.y_valid, verbose = 0)[0])
             if train_loss < last_train and valid_loss > last_valid and early_stopping:
                 break  #Early stopping
+            elif ((last_train - train_loss)/last_train) < tol_train:
+                return 0
+            elif ((last_valid - valid_loss)/last_valid) < tol_valid:
+                return 0
             else:
                 last_train = train_loss
                 last_valid = valid_loss
+
             print('--------Epoch = {}----------'.format(i*epochs_per_output))
             print('Training loss || Validation loss')
             print( '{:13.6f} || {:13.6f}'.format(train_loss, valid_loss))
@@ -125,7 +132,7 @@ class Force_Network():
         mae = np.mean(np.abs(error))
         max = np.max(np.abs(error))
 
-        print('======== Evaluation on test set =============\n\
+        print('======== Evaluation on ' + on +' set =============\n\
               RMSE =  {:5.4f}\n\
               MAE = {:5.4f}\n\
               Max. abs. error = {:5.4f}'.format(rmse, mae, max))
@@ -162,6 +169,29 @@ class Force_Network():
         self.scaler = supp['scaler']
         self.basis = supp['basis']
         self.compiled = True
+
+    def learning_curve(self, steps = 5):
+        tot_len = len(self.X_train)
+        save_X, save_y = np.array(self.X_train), np.array(self.y_train)
+        chunk_size = np.floor(tot_len/steps).astype(int)
+        N = []
+        train_rmse = []
+        valid_rmse = []
+        for s in range(steps+1):
+            train_size = int(tot_len/(2**steps)*2**s)
+            N.append(train_size)
+            self.X_train = save_X[:train_size]
+            self.y_train = save_y[:train_size]
+            print('Size = {}'.format(len(self.X_train)))
+            self.train(batch_size = np.ceil((len(self.X_train)/100)).astype(int),
+                        epochs_per_output = 100,
+                        tol_train = 1e-2,
+                        tol_valid = 1e-2)
+            train_rmse.append(self.evaluate(on='train')['rmse'])
+            valid_rmse.append(self.evaluate(on='valid')['rmse'])
+        self.X_train = save_X
+        self.y_train = save_y
+        return {'N': N, 'train': train_rmse, 'valid': valid_rmse}
 
 def load_force_model(net_dir, species):
     model = Force_Network(species, None, None, mask = [True])

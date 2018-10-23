@@ -11,6 +11,7 @@ from ase import units as ase_units
 from ase.md import logger
 import numpy as np
 import shutil
+from mlc_func import Timer
 import argparse
 try:
     from mbpol_calculator import MbpolCalculator
@@ -19,6 +20,12 @@ except ImportError:
     MBPOL_AVAIL = False
 
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+
+def log_all(energies = None, forces= None):
+    with open('energies.dat', 'a') as file:
+        file.write('{:.4f}\n'.format(energies))
+    with open('forces.dat', 'a') as file:
+        np.savetxt(file, forces, fmt = '%.4f')
 
 if __name__ == '__main__':
 
@@ -35,6 +42,10 @@ if __name__ == '__main__':
     parser.add_argument('-restart', action=('store_true'), help='Restart last calculation')
     parser.add_argument('-np', metavar='np', type=int, nargs = '?', default=1, help='Number of mpi processes')
     parser.add_argument('-pseudoloc', metavar='pseudoloc', type=str, nargs = '?', default='./', help='Location of pseudopotentials')
+    parser.add_argument('-log_every', metavar='log_every', type=int, nargs = '?', default=0,
+        help='Log forces and energies every n steps')
+    parser.add_argument('-cmcorrected', metavar='cmcorrected', type=int, nargs = '?', default=0,
+        help='Set CM momentum = 0 every n steps')
 
 
     args = parser.parse_args()
@@ -94,4 +105,16 @@ if __name__ == '__main__':
     else:
         raise Exception('Unknown integrator')
 
-    dyn.run(args.Nt)
+    for step in range(args.Nt):
+        time = Timer('Timer')
+        if args.log_every > 0:
+            if step%args.log_every == 0:
+                log_all(atoms.get_potential_energy(), atoms.get_forces())
+
+        if args.cmcorrected > 0:
+            if step%args.cmcorrected:
+                momenta = atoms.get_momenta()
+                atoms.set_momenta(momenta - np.mean(momenta, axis=0))
+
+        dyn.run(1)
+        time.stop()

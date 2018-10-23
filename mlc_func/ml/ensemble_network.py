@@ -46,8 +46,10 @@ class Ensemble_Network():
                                 b = self.models[idx].b, restart = True)
 
     def std_predict(self, feat, processed = False):
+
         if not np.alltrue(self.trained):
             raise Exception('Not all models trained. Call train_next()')
+
         predictions = []
         for m in self.models:
             predictions.append(m.predict(feat, processed))
