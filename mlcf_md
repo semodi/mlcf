@@ -21,11 +21,14 @@ except ImportError:
 
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
 
-def log_all(energies = None, forces= None):
+def log_all(energies = None, forces= None, coords = None):
     with open('energies.dat', 'a') as file:
         file.write('{:.4f}\n'.format(energies))
     with open('forces.dat', 'a') as file:
         np.savetxt(file, forces, fmt = '%.4f')
+    with open('coords.dat', 'a') as file:
+        np.savetxt(file, forces, fmt = '%.4f')
+
 
 if __name__ == '__main__':
 
@@ -107,14 +110,20 @@ if __name__ == '__main__':
 
     for step in range(args.Nt):
         time = Timer('Timer')
-        if args.log_every > 0:
-            if step%args.log_every == 0:
-                log_all(atoms.get_potential_energy(), atoms.get_forces())
 
         if args.cmcorrected > 0:
-            if step%args.cmcorrected:
+            if step%args.cmcorrected == 0:
                 momenta = atoms.get_momenta()
                 atoms.set_momenta(momenta - np.mean(momenta, axis=0))
+                momenta = atoms.get_momenta()
+                cmfile = open('cmcorrection','a')
+                np.savetxt(cmfile, np.mean(momenta,axis=0) , fmt = '%.4f')
+                cmfile.close()
+
+        if args.log_every > 0:
+            if step%args.log_every == 0:
+                log_all(atoms.get_potential_energy(), atoms.get_forces(), atoms.get_positions())
+
 
         dyn.run(1)
         time.stop()
