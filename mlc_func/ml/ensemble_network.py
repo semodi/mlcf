@@ -17,7 +17,6 @@ class Ensemble_Network():
             self.models[i].X_train = X_train[i::3]
             self.models[i].y_train = y_train[i::3]
 
-        assert not np.allclose(self.models[0].X_train, self.models[1].X_train)
 
         self.trained = [False, False, False]
         self.model_pointer = 0
