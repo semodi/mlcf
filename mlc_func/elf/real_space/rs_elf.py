@@ -293,9 +293,9 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     indices_list = []
     time_setup = Timer('TIME_GET_ELFS_SETUP')
     n_workers = len(view)
-    spec_filt = [sp in basis_species.lower() for sp in atoms.get_chemical_symbols()]
+    spec_filt = [sp.lower() in basis_species for sp in atoms.get_chemical_symbols()]
     for pos, sym, idx in zip(distribute_workload(atoms.get_positions()[spec_filt], n_workers),
-                        distribute_workload(atoms.get_chemical_symbols()[spec_filt], n_workers),
+                        distribute_workload(np.array(atoms.get_chemical_symbols())[spec_filt], n_workers),
                         distribute_workload(np.arange(len(atoms)).astype(int)[spec_filt], n_workers)):
 
         density_list.append([])
