@@ -2,7 +2,6 @@ import sys
 import os
 import shutil
 from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
-from mlc_func.calculator import MLCF_Calculator
 import numpy as np
 
 class Mixer(Siesta):
@@ -41,8 +40,11 @@ class Mixer(Siesta):
                     print('Only mixing ' + self.correct_species)
                     dont_correct = [s.lower() not in self.correct_species.lower() for s in atoms.get_chemical_symbols()]
                     self.forces[dont_correct] = f_fast[dont_correct]
-                    if isinstance(self.fast_calculator, MLCF_Calculator) and self.fast_calculator.cm_corrected:
-                        self.forces[dont_correct] -= np.mean(self.forces, axis = 0)    
+                    try:
+                        if self.fast_calculator.cm_corrected:
+                            self.forces[dont_correct] -= np.mean(self.forces, axis = 0)    
+                    except AttributeError:
+                        pass
 
                 with open('forces_mixing.dat', 'a') as file:
                     np.savetxt(file, f_slow - f_fast, fmt = '%.4f')
