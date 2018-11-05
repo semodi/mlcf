@@ -40,6 +40,12 @@ class Mixer(Siesta):
                     print('Only mixing ' + self.correct_species)
                     dont_correct = [s.lower() not in self.correct_species.lower() for s in atoms.get_chemical_symbols()]
                     self.forces[dont_correct] = f_fast[dont_correct]
+                    try:
+                        if self.fast_calculator.cm_corrected:
+                            self.forces[dont_correct] -= np.mean(self.forces, axis = 0)*len(self.forces)/len(self.forces[dont_correct])
+                    except AttributeError:
+                        pass
+
 
                 with open('forces_mixing.dat', 'a') as file:
                     np.savetxt(file, f_slow - f_fast, fmt = '%.4f')

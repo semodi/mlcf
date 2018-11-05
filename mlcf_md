@@ -27,7 +27,7 @@ def log_all(energies = None, forces= None, coords = None):
     with open('forces.dat', 'a') as file:
         np.savetxt(file, forces, fmt = '%.4f')
     with open('coords.dat', 'a') as file:
-        np.savetxt(file, forces, fmt = '%.4f')
+        np.savetxt(file, coords, fmt = '%.4f')
 
 
 if __name__ == '__main__':
