@@ -3,7 +3,7 @@ import mlc_func as mlcf
 import os
 from ase import Atoms
 from ase.md.npt import NPT
-from ase.md import VelocityVerlet
+from ase.md import VelocityVerlet, Langevin
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.io import read,write, Trajectory
 from ase import io
@@ -105,6 +105,11 @@ if __name__ == '__main__':
         dyn = VelocityVerlet(atoms, dt = args.dt * ase_units.fs,
                              trajectory=traj,
                              logfile='../'+ args.name + '.log')
+    elif args.integrator.lower() == 'lv':
+         dyn = Langevin(atoms, timestep = args.dt * ase_units.fs,
+                  temperature =  args.T * ase_units.kB, friction = 1e-3,
+                             trajectory=traj,
+                             logfile= '../'+ args.name + '.log')
     else:
         raise Exception('Unknown integrator')
 
