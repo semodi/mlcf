@@ -193,6 +193,20 @@ class Force_Network():
         self.y_train = save_y
         return {'N': N, 'train': train_rmse, 'valid': valid_rmse}
 
+    def predict_from_hdf5(self, path):
+        elfs, angles = elf.utils.hdf5_to_elfs_fast(path)
+        if self.species in elfs:
+            species = self.species
+            n_samples = len(elfs[species])
+            elfs[species] = elfs[species].reshape(-1,elfs[species].shape[-1])
+            angles[species] = angles[species].reshape(-1,3)
+            predictions = self.predict(elfs[species], False)
+            for i, (value, a) in enumerate(zip(predictions, angles[species])):
+                predictions[i] = elf.geom.rotate_vector(np.array([value]),
+                                                                a, False)
+        return predictions.reshape(n_samples,-1,3)
+
+
 def load_force_model(net_dir, species):
     model = Force_Network(species, None, None, mask = [True])
     model.load_all(net_dir)
