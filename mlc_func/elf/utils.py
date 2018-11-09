@@ -231,7 +231,7 @@ def hdf5_to_elfs_fast(path, species_filter = ''):
             species_filter = [s.astype(str).lower() for s in np.unique(all_species)]
 
         for species in species_filter:
-            filt = (all_species.astype(str) == species.upper())
+            filt = ((all_species.astype(str) == species.upper()) | (all_species.astype(str) == species.lower()))
             length = all_lengths[np.where(filt)[0][0]]
             values_dict[species] = values[filt,:length].reshape(n_systems,-1,length)
             angles_dict[species] = angles[filt,:].reshape(n_systems,-1,3)
@@ -247,6 +247,8 @@ def change_alignment(path, traj_path, new_method, save_as = None):
 
     if new_method == basis['alignment']:
         raise Exception('Already aligned with method: ' + new_method)
+    else:
+        basis['alignment'] = new_method
 
     #Rotate to neutral
     for i, elf_system in enumerate(elfs):
@@ -256,6 +258,7 @@ def change_alignment(path, traj_path, new_method, save_as = None):
                                              inverse = False)
             elfs[i][j].angles = np.array([0,0,0])
             elfs[i][j].unitcell = atoms[i].get_cell()
+            elfs[i][j].basis = basis
 
     oriented_elfs = []
 
@@ -265,4 +268,4 @@ def change_alignment(path, traj_path, new_method, save_as = None):
     if save_as == None:
         return oriented_elfs
     else:
-        elfs_to_hdf5(oriented_elfs, path)
+        elfs_to_hdf5(oriented_elfs, save_as)

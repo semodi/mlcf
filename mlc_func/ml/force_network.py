@@ -37,6 +37,8 @@ class Force_Network():
             self.y_train = datasets['y_train']
             self.y_test = datasets['y_test']
             self.y_valid = datasets['y_valid']
+        else:
+            self.X_train = None
         self.scaler = scaler
         self.basis = basis
         if len(mask) == 0:

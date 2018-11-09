@@ -369,10 +369,13 @@ def orient_elf(i, elf, all_pos, mode):
         angles_getter = get_elfcs_angles
     elif mode == 'nn':
         angles_getter = get_nncs_angles
-    else:
+    elif mode.lower() != 'neutral':
         raise Exception('Unkown mode: {}'.format(mode))
 
-    angles = angles_getter(i, fold_back_coords(i, all_pos, elf.unitcell), elf.value)
+    if mode.lower() == 'neutral':
+        angles = np.array([0,0,0])
+    else:
+        angles = angles_getter(i, fold_back_coords(i, all_pos, elf.unitcell), elf.value)
     oriented = make_real(rotate_tensor(elf.value, np.array(angles), True))
     elf_oriented = ElF(oriented, angles, elf.basis, elf.species, elf.unitcell)
     return elf_oriented
