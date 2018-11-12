@@ -4,7 +4,7 @@ import os
 import pickle
 import mlc_func.elf.siesta as siesta
 from mlc_func.elf.geom import make_real, rotate_tensor, get_nncs_angles,\
- get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector, fold_back_coords
+ get_casimir, get_elfcs_angles, rotate_vector, fold_back_coords
 from mlc_func.elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
 import numpy as np
@@ -69,27 +69,6 @@ def test_fold_back_coords():
 
     coords_folded_2 = np.array([[1,0,1],[1,-2,0]]).astype(float)
     assert np.allclose(coords_folded_2,fold_back_coords(0,coords,uc2))
-
-def test_p_cov():
-    """ Test whether p transforms covariantly under SO(3) rotations
-    """
-    for i in [3,1,2,4,0]:
-
-        p_init = tensor_to_P(elf[i])
-
-        for it in range(10):
-            rand_ang = np.random.rand(3)*2*np.pi
-            elf_rotated = rotate_tensor(elf[i],rand_ang)
-            p_rotated = tensor_to_P(elf_rotated)
-            p = rotate_vector(p_rotated, rand_ang, inverse = True)
-            assert np.allclose(p, p_init)
-
-        for it in range(10):
-            rand_ang = np.random.rand(3)*2*np.pi
-            elf_rotated = rotate_tensor(elf[i],rand_ang)
-            p_rotated = tensor_to_P(elf_rotated)
-            p = rotate_vector(p_init, rand_ang)
-            assert np.allclose(p, p_rotated)
 
 if __name__ == '__main__':
     pass

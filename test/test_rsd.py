@@ -2,10 +2,11 @@ import pytest
 import unittest
 import mlc_func.elf.siesta as siesta
 from mlc_func.elf.geom import make_real, rotate_tensor, get_nncs_angles,\
- get_casimir, get_elfcs_angles, tensor_to_P, rotate_vector
+ get_casimir, get_elfcs_angles, rotate_vector
 from mlc_func.elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
 from mlc_func.elf.utils import preprocess_all
+from mlc_func.elf.water import get_water_angles
 import os
 import numpy as np
 import pickle
@@ -46,6 +47,30 @@ def test_rs_elf():
 #     elfs = np.array([e[0].value for e in elfs])
 #     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
 #     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
+
+def test_watercs():
+    """ Test whether nearest neighbor reproduces the reference values for elf
+    """
+    for i in [3,1,4,0]:
+
+        angles1 = get_water_angles(i, atoms.get_positions())
+        rotated1 = rotate_tensor(elf[i], angles1, inverse = True)
+
+        for it in range(5):
+            rand_ang = np.random.rand(3)*2*np.pi
+            elf_rotated = rotate_tensor(elf[i],rand_ang)
+            coords_rotated = rotate_vector(atoms.get_positions()-\
+                atoms.get_positions()[i], rand_ang)
+
+            angles2 = get_water_angles(i, coords_rotated)
+            rotated2 = rotate_tensor(elf_rotated, angles2, inverse = True)
+
+            for key in rotated1:
+                np.allclose(rotated1[key], rotated2[key], atol= 1e-6)
+    # pickle.dump(rotated1, open('./test/elf_nncs.dat','wb'))
+    # elf_ref = pickle.load(open('./test/elf_nncs.dat','rb'))
+    # for key in elf[0]:
+        # assert np.allclose(rotated1[key], elf_ref[key])
 
 def test_nncs():
     """ Test whether nearest neighbor reproduces the reference values for elf

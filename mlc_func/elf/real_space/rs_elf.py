@@ -13,6 +13,7 @@ from mlc_func.elf.geom import make_real, rotate_tensor, fold_back_coords
 from mlc_func.elf import ElF
 from mlc_func.elf.serial_view import serial_view
 from mlc_func import Timer
+from mlc_func.elf.water import get_water_angles
 
 def mesh_around(pos, radius, density, unit = 'A'):
     '''
@@ -24,18 +25,18 @@ def mesh_around(pos, radius, density, unit = 'A'):
 
     pos = pos.flatten()
 
-    U = np.array(density.unitcell) # Matrix to go from real space to mesh coordinates
+    U = np.array(density.unitcell)  # Matrix to go from real space to mesh coordinates
     for i in range(3):
-        U[i,:] = U[i,:] / density.grid[i]
-    a = np.linalg.norm(density.unitcell, axis = 1)/density.grid[:3]
+        U[i, :] = U[i, :]/density.grid[i]
+    a = np.linalg.norm(density.unitcell, axis=1)/density.grid[:3]
     U = U.T
 
-    #Create box with max. distance = radius
+    # Create box with max. distance = radius
     rmax = np.ceil(radius / a).astype(int).tolist()
     Xm, Ym, Zm = density.mesh_3d(scaled = False, pbc= False, rmax = rmax, indexing = 'ij')
     X, Y, Z = density.mesh_3d(scaled = True, pbc= False, rmax = rmax, indexing = 'ij')
 
-    #Find mesh pos.
+    # Find mesh pos.
     cm = np.round(np.linalg.inv(U).dot(pos)).astype(int)
     dr = pos  - U.dot(cm)
     X -= dr[0]
@@ -369,6 +370,8 @@ def orient_elf(i, elf, all_pos, mode):
         angles_getter = get_elfcs_angles
     elif mode == 'nn':
         angles_getter = get_nncs_angles
+    elif mode =='water':
+        angles_getter = get_water_angles
     elif mode.lower() != 'neutral':
         raise Exception('Unkown mode: {}'.format(mode))
 
