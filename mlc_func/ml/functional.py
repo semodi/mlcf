@@ -259,7 +259,7 @@ def build_force_mlcf(feature_src, target_src, traj_src, species, mask = [], filt
     return Force_Network(species, scaler, basis, datasets, mask)
 
 def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
-    filters = [], test_size = 0.2):
+    filters = [], autofilt_percent = 0, test_size = 0.2):
 
     ''' Return a trainable energy MLCF (neural network)
 
@@ -293,8 +293,15 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
         elfs, _ = elf.utils.hdf5_to_elfs_fast(fsrc)
 
         targets = np.genfromtxt(tsrc, delimiter = ',')
+
         if not isinstance(filter, list) and not isinstance(filter, np.ndarray):
-            filter = [True] * len(targets)
+
+            percentile_cutoff = autofilt_percent
+            lim1 = np.percentile(targets, percentile_cutoff*100)
+            lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+            min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+            filter = (targets > min_lim) & (targets < max_lim)
+
         if len(masks) != len(elfs):
             no_mask = True
             for species in elfs:
@@ -317,3 +324,15 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
         return Network(sets), masks
     else:
         return Network(sets)
+
+def get_energy_filters(target_src, autofilt_percent = 0):
+    filters = []
+    for tsrc in target_src:
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+        percentile_cutoff = autofilt_percent
+        lim1 = np.percentile(targets, percentile_cutoff*100)
+        lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+        min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+        filter = (targets > min_lim) & (targets < max_lim)
+        filters.append(filter)
+    return filters

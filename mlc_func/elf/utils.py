@@ -245,10 +245,10 @@ def change_alignment(path, traj_path, new_method, save_as = None):
     with File(path) as file:
         basis = json.loads(file.attrs['basis'])
 
-    if new_method == basis['alignment']:
-        raise Exception('Already aligned with method: ' + new_method)
-    else:
-        basis['alignment'] = new_method
+    # if new_method == basis['alignment']:
+        # raise Exception('Already aligned with method: ' + new_method)
+    # else:
+    basis['alignment'] = new_method
 
     #Rotate to neutral
     for i, elf_system in enumerate(elfs):
