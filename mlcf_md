@@ -18,6 +18,7 @@ try:
     MBPOL_AVAIL = True
 except ImportError:
     MBPOL_AVAIL = False
+from mlc_func.calculator import ListIntegrator
 
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
 
@@ -55,11 +56,16 @@ if __name__ == '__main__':
     ttime = args.ttime
     if args.np > 1:
         os.environ['SIESTA_COMMAND'] = 'mpirun -np {} siesta < ./%s > ./%s'.format(args.np)
+    else:
+        os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'.format(args.np)
+
     os.environ['SIESTA_PP_PATH'] = args.pseudoloc
     args.Nt = int(args.Nt)
     # Load initial configuration
     if not args.dir[-1] =='/': args.dir += '/'
-    if args.restart:
+    if args.integrator.lower() == 'list':
+        atoms = read(args.startfile, ':')
+    elif args.restart:
         atoms = read(args.dir + args.name + '.traj')
     else:
         atoms = read(args.startfile)
@@ -68,21 +74,27 @@ if __name__ == '__main__':
         atoms.set_momenta(atoms.get_momenta() - np.mean(atoms.get_momenta(), axis =0))
 
     calcdir = os.getcwd()
+    args.calcfile = calcdir + '/' + args.calcfile
     try:
         shutil.os.mkdir(args.dir)
     except FileExistsError:
         pass
     os.chdir(args.dir)
 
+    workdir = args.startfile.split('.')[0] if args.integrator.lower() == 'list' else 'siesta'
+    workdir += '/'
+
+    os.environ['SIESTA_WORKING_DIR'] = workdir
     try:
-        shutil.os.mkdir('siesta/')
+        shutil.os.mkdir(workdir)
     except FileExistsError:
         pass
-    os.chdir('siesta/')
+    os.chdir(workdir)
 
 
-    calculator = mlcf.calculator.load_from_file(calcdir + '/' + args.calcfile)
-    traj = io.Trajectory('../' + args.name  + '.traj',
+    calculator = mlcf.calculator.load_from_file(args.calcfile)
+    if not args.integrator.lower() == 'list':
+        traj = io.Trajectory('../' + args.name  + '.traj',
                          mode = 'a', atoms = atoms)
 
     if isinstance(calculator, mlcf.calculator.Mixer):
@@ -93,7 +105,8 @@ if __name__ == '__main__':
     elif isinstance(calculator, MbpolCalculator):
         calculator = MbpolCalculator(atoms)
 
-    atoms.calc = calculator
+    if not args.integrator == 'list':
+        atoms.calc = calculator
 
     if args.integrator.lower() == 'nh':
         dyn = NPT(atoms, timestep = args.dt * ase_units.fs,
@@ -110,6 +123,9 @@ if __name__ == '__main__':
                   temperature =  args.T * ase_units.kB, friction = 1e-3,
                              trajectory=traj,
                              logfile= '../'+ args.name + '.log')
+    elif args.integrator.lower() == 'list':
+        dyn = ListIntegrator(atoms, args.calcfile, args.np)
+        args.Nt = 1
     else:
         raise Exception('Unknown integrator')
 
