@@ -443,8 +443,11 @@ class Network():
         with open(os.path.join(net_dir,'subnets'),'wb') as file:
             pickle.dump(self.subnets,file)
 
+        to_save = {'mask': self.masks}
+
         self.save_model(os.path.join(net_dir,'model'))
 
+        pickle.dump(to_save, open(os.path.join(net_dir,'supp'), 'wb'))
 
 
     def load_all(self, net_dir):
@@ -456,7 +459,7 @@ class Network():
             self.subnets = pickle.load(file)
 
         self.restore_model(os.path.join(net_dir,'model'))
-        self.masks = pickle.load(open(net_dir + '/' +'masks', 'rb'))
+        self.masks = pickle.load(open(os.path.join(net_dir,'supp'), 'rb'))['mask']
 
 class Subnet():
     """ Subnetwork that is associated with one Atom

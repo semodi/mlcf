@@ -289,7 +289,9 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
         filters = [0]*len(feature_src)
 
     no_mask = False
+
     for fsrc, tsrc, filter in zip(feature_src, target_src, filters):
+
         elfs, _ = elf.utils.hdf5_to_elfs_fast(fsrc)
 
         targets = np.genfromtxt(tsrc, delimiter = ',')
@@ -320,10 +322,9 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
                     targets, test_size = 0.2)
 
         sets.append(subnets)
-    if no_mask:
-        return Network(sets), masks
-    else:
-        return Network(sets)
+    network = Network(sets)
+    network.masks = masks
+    return network
 
 def get_energy_filters(target_src, autofilt_percent = 0):
     filters = []
