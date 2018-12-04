@@ -29,6 +29,7 @@ class Network():
         else:
             self.subnets = subnets
 
+
         self.model_loaded = False
         self.rand_state = np.random.get_state()
         self.graph = None
@@ -40,6 +41,8 @@ class Network():
         self.optimizer = None
         self.checkpoint_path = None
         self.masks = {}
+        self.species_nets = {}
+        self.species_nets_names = {}
         scale_together(subnets)
 
     # ========= Network operations ============ #
@@ -71,6 +74,7 @@ class Network():
         self.initialized = False
         self.optimizer = None
         self.checkpoint_path = None
+
 
     def construct_network(self):
         """ Builds the tensorflow graph from subnets
@@ -309,6 +313,7 @@ class Network():
 
     def predict(self, data, species, use_masks = False):
 
+        species = species.lower()
         if data.ndim == 2:
             data = data.reshape(-1,1,data.shape[1])
         else:
@@ -318,39 +323,50 @@ class Network():
 
         ds = Dataset(data, species)
         targets = np.zeros(data.shape[0])
-        snet = Subnet()
 
-        found = False
-        for s in self.subnets:
-            if found == True:
-                break
-            if isinstance(s,list):
-                for s2 in s:
-                    if s2.species == ds.species:
-                        snet.scaler = s2.scaler
-                        snet.layers = s2.layers
-                        snet.targets = s2.targets
-                        snet.activations = s2.activations
-                        print("Sharing scaler with species " + s2.species)
-                        found = True
-                        break
-            else:
-                if s.species == ds.species:
-                    snet.scaler = s.scaler
-                    snet.layers = s.layers
-                    snet.targets = s.targets
-                    snet.activations = s.activations
-                    print("Sharing scaler with species " + s.species)
+        if not species in self.species_nets:
+            self.species_nets[species] = Subnet()
+            found = False
+
+            snet = self.species_nets[species]
+            for s in self.subnets:
+                if found == True:
                     break
+                if isinstance(s,list):
+                    for s2 in s:
+                        if s2.species == ds.species:
+                            snet.scaler = s2.scaler
+                            snet.layers = s2.layers
+                            snet.targets = s2.targets
+                            snet.activations = s2.activations
+                            print("Sharing scaler with species " + s2.species)
+                            found = True
+                            break
+                else:
+                    if s.species == ds.species:
+                        snet.scaler = s.scaler
+                        snet.layers = s.layers
+                        snet.targets = s.targets
+                        snet.activations = s.activations
+                        print("Sharing scaler with species " + s.species)
+                        break
 
+        snet = self.species_nets[species]
         snet.add_dataset(ds, targets, test_size=0.0)
-        self = self % snet
-
-        result = self.get_logits()[-1]
-
-        del self.subnets[-1]
-
-        return result
+        print('Hello World')
+        if not self.model_loaded:
+            raise Exception('Model not loaded!')
+        else:
+            with self.graph.as_default():
+                if species in self.species_nets_names:
+                    logits = self.graph.get_tensor_by_name(self.species_nets_names[species])
+                else:
+                    logits, _, _ = snet.get_logits(100000)
+                    self.species_nets_names[species] = logits.name
+                print(logits.name)
+                sess = self.sess
+                return sess.run(logits, feed_dict=snet.get_feed(which='train',
+                 train_valid_split=1.0))
 
     def get_logits(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
