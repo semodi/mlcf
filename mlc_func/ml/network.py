@@ -372,7 +372,7 @@ class Network():
                 if return_gradient:
                     grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
                      train_valid_split=1.0))[0]
-                    grad = snet.scaler.transform(grad)
+                    grad = grad/np.sqrt(snet.scaler.var_).reshape(1,-1)
                     energies = (energies, grad)
 
                 return energies
