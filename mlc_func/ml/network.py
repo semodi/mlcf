@@ -43,6 +43,7 @@ class Network():
         self.masks = {}
         self.species_nets = {}
         self.species_nets_names = {}
+        self.species_gradients_names = {}
         scale_together(subnets)
 
     # ========= Network operations ============ #
@@ -311,7 +312,7 @@ class Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, data, species, use_masks = False):
+    def predict(self, data, species, use_masks = False, return_gradient = False):
 
         species = species.lower()
         if data.ndim == 2:
@@ -353,20 +354,28 @@ class Network():
 
         snet = self.species_nets[species]
         snet.add_dataset(ds, targets, test_size=0.0)
-        print('Hello World')
         if not self.model_loaded:
             raise Exception('Model not loaded!')
         else:
             with self.graph.as_default():
                 if species in self.species_nets_names:
                     logits = self.graph.get_tensor_by_name(self.species_nets_names[species])
+                    gradients = self.graph.get_tensor_by_name(self.species_gradients_names[species])
                 else:
-                    logits, _, _ = snet.get_logits(100000)
+                    logits, x, _ = snet.get_logits(1)
+                    gradients = tf.gradients(logits, x)[0].values
                     self.species_nets_names[species] = logits.name
-                print(logits.name)
+                    self.species_gradients_names[species] = gradients.name
                 sess = self.sess
-                return sess.run(logits, feed_dict=snet.get_feed(which='train',
-                 train_valid_split=1.0))
+                energies = sess.run(logits, feed_dict=snet.get_feed(which='train',
+                     train_valid_split=1.0))
+                if return_gradient:
+                    grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
+                     train_valid_split=1.0))[0]
+                    grad = snet.scaler.transform(grad)
+                    energies = (energies, grad)
+
+                return energies
 
     def get_logits(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
