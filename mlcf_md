@@ -21,6 +21,7 @@ except ImportError:
 from mlc_func.calculator import ListIntegrator
 
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+os.environ['QT_QPA_PLATFORM']='offscreen'
 
 def log_all(energies = None, forces= None, coords = None):
     with open('energies.dat', 'a') as file:

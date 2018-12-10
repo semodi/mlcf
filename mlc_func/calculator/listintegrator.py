@@ -9,7 +9,7 @@ import shutil
 
 def single_thread(atoms_list, calcfile, env):
     import os
-    from mlc_func.calculator import *
+    from mlc_func.calculator import load_from_file
     os.environ['QT_QPA_PLATFORM']='offscreen'
     os.environ['SIESTA_COMMAND'] = env['SIESTA_COMMAND']
     os.environ['SIESTA_PP_PATH'] = env['SIESTA_PP_PATH']
