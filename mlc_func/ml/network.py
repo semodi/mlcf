@@ -180,6 +180,8 @@ class Network():
         optimizer: {tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...}
         adaptive_rate: boolean; wether to adjust step_size if cost increases
                         not recommended for AdamOptimizer
+        multiplier: list of float, multiplier that allow to give datasets more
+            weight than others
 
         Returns:
         --------
@@ -312,18 +314,32 @@ class Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, data, species, use_masks = False, return_gradient = False):
+    def predict(self, features, species, use_masks = False, return_gradient = False):
+        """ Get predicted energies
 
+        Parameters:
+        ----------
+        features: np.ndarray, input features
+        species: str, predict atomic contribution to energy for this species
+        use_masks: bool, whether masks should be applied to the provided features
+        return_gradient: instead of returning energies, return gradient of network
+            w.r.t. input features
+
+        Returns:
+        -------
+        np.ndarray, predicted energies or gradient
+
+        """
         species = species.lower()
-        if data.ndim == 2:
-            data = data.reshape(-1,1,data.shape[1])
+        if features.ndim == 2:
+            features = features.reshape(-1,1,features.shape[1])
         else:
-            raise Exception('data.ndim != 2')
+            raise Exception('features.ndim != 2')
         if use_masks:
-            data = data[:,:,self.masks[species]]
+            features = features[:,:,self.masks[species]]
 
-        ds = Dataset(data, species)
-        targets = np.zeros(data.shape[0])
+        ds = Dataset(features, species)
+        targets = np.zeros(features.shape[0])
 
         if not species in self.species_nets:
             self.species_nets[species] = Subnet()
@@ -678,6 +694,16 @@ class Subnet():
         assert len(X_test) == len(y_test)
 
 def load_network(path):
+    """ Load energy MLCF
+
+    Parameters:
+    ---------
+    path: str, directory in which MLCF is stored
+
+    Returns:
+    -------
+    Network (energy MLCF)
+    """
     network = Network([])
     network.load_all(path)
     return network

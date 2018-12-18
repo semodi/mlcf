@@ -1,9 +1,3 @@
-""" Module that contains functions to preprocess quantumm chemical data such as
-atomic positions and/or positions and width of Gaussians that are fitted
-to the charge density. Preprocessed datasets are then used in subnet and network,
-for a Neural Network similar to that proposed by Behler et al.
-"""
-
 import numpy as np
 from collections import namedtuple
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -23,38 +17,6 @@ def reshape_group(x, n):
 
     return x
 
-# def remove_outliers(all_subnets, which_set='train', use='features'):
-#
-#
-#     subnet_dict = {}
-#
-#     def add_to_dict(sn):
-#         if not sn.species in subnet_dict:
-#             subnet_dict[sn.species] = []
-#         subnet_dict[sn.species].append(sn)
-#
-#     for sn1 in all_subnets:
-#         if isinstance(sn1, list):
-#             for sn1 in sn1:
-#                 add_to_dict(sn1)
-#         else:
-#             add_to_dict(sn1)
-#
-#     for species in subnet_dict:
-#         subnets = subnet_dict[species]
-#         for s in subnets:
-#             if not s.species == subnets[0].species:
-#                 raise Exception('Subnets do not contain the same species. Proceeding...')
-#
-#         if not isinstance(subnets ,list):
-#             Exception('Input must be a list of subnets')
-#         if which_set == 'train':
-#             all_feat = np.concatenate([s.scaler.inverse_transform(s.X_train.reshape(-1, s.features)) for s in subnets])
-#             all_tar = np.concatenate([s.scaler.inverse_transform(s.y_train) for s in subnets])
-#         else:
-#             all_feat = np.concatenate([s.scaler.inverse_transform(s.X_test.reshape(-1, s.features)) for s in subnets])
-#             all_tar = np.concatenate([s.scaler.inverse_transform(s.y_test) for s in subnets])
-#
 def scale_together(all_subnets):
     """ Scale data in given subnets by combining the data ranges
         (Should always be performed if subnets share weights)

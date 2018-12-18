@@ -3,8 +3,16 @@ import numpy as np
 import copy
 
 class Ensemble_Network():
-
+    """ Ensemble Network to obtain confidence intervals for predictions
+    """
     def __init__(self, network, n = 3):
+        """
+        Parameters:
+        -----------
+        network: Network, root network from which to create ensemble
+        n: int, ensemble size
+        """
+
         self.models = []
         for _ in range(n):
             self.models.append(copy.copy(network))
@@ -24,12 +32,20 @@ class Ensemble_Network():
         self.model_pointer = 0
 
     def train(self, idx):
+        """ Train model specified by idx
 
+        Parameters:
+        --------
+        idx: int, ensemble index
+        """
         self.trained[idx] = True
         self.models[idx].train(step_size = self.models[idx].learning_rate,
                                 b = self.models[idx].b, restart = True)
 
     def train_next(self):
+        """ Train the next untrained model unit all models are trained
+        """
+
         cycle_cnt = 0
         while(True):
             cycle_cnt += 1
@@ -47,6 +63,18 @@ class Ensemble_Network():
                                 b = self.models[idx].b, restart = True)
 
     def predict(self, feat, processed = False):
+        """ Get mean prediction across ensemble
+
+        Parameters:
+        ----------
+        feat: np.ndarray, input features
+        processed: bool, are features processed (scaled, masked)?
+
+        Returns:
+        -------
+        np.ndarray, mean prediction
+        """
+
         if not np.alltrue(self.trained):
             raise Exception('Not all models trained. Call train_next()')
 
@@ -56,6 +84,19 @@ class Ensemble_Network():
         return np.mean(np.array(predictions), axis = 0)
 
     def predict_from_hdf5(self, path):
+        """ Get mean prediction across ensemble but instead of providing features,
+        give source path where features are found
+
+        Parameters:
+        ----------
+        path:  path to .hdf5 file containing features
+
+        Returns:
+        -------
+        np.ndarray, mean prediction
+
+        """
+
         if not np.alltrue(self.trained):
             raise Exception('Not all models trained. Call train_next()')
 
@@ -65,11 +106,29 @@ class Ensemble_Network():
         return np.mean(np.array(predictions), axis = 0)
 
     def save(self, net_dir, override = False):
+        """ Save ensemble Network
+
+        Parameters:
+        ----------
+        net_dir: str, directory where to save network
+        override: bool, if network already exists allow to override? default = False
+        """
         if net_dir[-1] == '/': net_dir = net_dir[:-1]
         for i, model in enumerate(self.models):
             model.save_all(net_dir + '/ensemble_{}'.format(i+1), override)
 
     def std_predict(self, feat, processed = False):
+        """ Get standard deviation of predictions across ensemble
+
+        Parameters:
+        ----------
+        feat: np.ndarray, input features
+        processed: bool, are features processed (scaled, masked)?
+
+        Returns:
+        -------
+        np.ndarray, std of predictions
+        """
 
         if not np.alltrue(self.trained):
             raise Exception('Not all models trained. Call train_next()')
@@ -82,6 +141,18 @@ class Ensemble_Network():
         return std
 
 def load_ensemble_network(net_dir, n, species):
+    """Loads an ensemble Network
+
+    Parameters:
+    ----------
+    net_dir: str, directory in which network is stored
+    n: int, number of networks per ensemble
+    species: str, which chem. element to load for
+
+    Returns:
+    -------
+    Ensemble_Network
+    """
 
     if net_dir[-1] == '/': net_dir = net_dir[:-1]
     if n > 0:

@@ -14,10 +14,22 @@ import os
 import pickle
 
 class Force_Network():
-
+    """ MLCF for force perdiction"""
     def __init__(self, species, scaler, basis, datasets = {}, mask = [], n_layers = 3, nodes_per_layer = 8,
                 b = 0):
+        """
+        Parameters
+        ----------
 
+        species: str, chemical element symbol
+        scaler: sklearn Scaler
+        basis: dict, basis that was used to create electronic descriptors
+        datasets: dict, datasets provided as {'X_train': np.ndarray, 'X_test': etc...}
+        mask: list of bool, used to mask the features and filter out features with low variance
+        n_layers: int, number of hidden layers, default = 3
+        nodes_per_layer: int, nodes for each hidden layer, default = 8
+        b: float, l2-regularization strenght, default = 0
+        """
 
         self.species = species
         self.n_layers = n_layers
@@ -47,10 +59,10 @@ class Force_Network():
             self.mask = mask
 
         if not (scaler == None or basis == None):
-            self.build_model()
+            self.__build_model()
 
 
-    def build_model(self, override = False):
+    def __build_model(self, override = False):
         if self.compiled and not override:
             raise Exception('Model already compiled! Set override = True to proceed.')
 
@@ -83,12 +95,26 @@ class Force_Network():
               restart = False,
               tol_train = 0,
               tol_valid = 0):
+        """ Train the model
 
+        Parameters:
+        -----------
+        step_size: float, step size to take during gradient descent, default=0.001
+        max_epochs: int, max. number of epochs to train, default=50001
+        b: float, l2-regularization
+        early_stopping: bool, use early stopping (interrupt training once valid loss increases),
+            default=False
+        batch_size: int, number of samples per batch, default=500
+        epochs_per_output: int, only print overview every epochs_per_output steps, default=500
+        restart: bool, restart training from beginning (reset network), default=False
+        tol_train: float, stop training if relative value of training loss decreases by less than this value
+        tol_valid: float, stop training if relative value of validation loss decreases by less than this value
+        """
 
         if not self.compiled or restart:
             self.learning_rate = step_size
             self.b = b
-            self.build_model(override = True)
+            self.__build_model(override = True)
             self.__compile_model(override=True)
         elif step_size != self.learning_rate or b != self.b:
             if not restart:
@@ -118,12 +144,34 @@ class Force_Network():
 
 
     def predict(self, feat, processed = False):
+        """ Get predicted forces
+
+        Parameters:
+        ----------
+        feat: np.ndarray, input features
+        processed: bool, are features processed (scaled, masked)?
+
+        Returns:
+        -------
+        np.ndarray, predicted forces
+        """
         if not processed:
             return self.model.predict(self.scaler.transform(feat[:,self.mask]))
         else:
             return self.model.predict(feat)
 
     def evaluate(self, plot = False, on = 'test'):
+        """ Evaluate model performance
+
+        Parameters:
+        -----------
+        plot: bool, plot correlation plots
+        on: {'test','train','valid'} which set to evaluat on
+
+        Returns:
+        --------
+        dict, containing rmse, mae and max. abs. error
+        """
         X, y = {'train':[self.X_train, self.y_train],
                 'valid':[self.X_valid, self.y_valid],
                 'test':[self.X_test, self.y_test]}[on]
@@ -151,6 +199,14 @@ class Force_Network():
         return {'rmse' : rmse, 'mae': mae, 'max': max}
 
     def save_all(self, net_dir, override = False):
+        """ Save force MLCF
+
+        Parameters:
+        -----------
+        net_dir: str, directory to save mlcf to
+        override: bool, if net_dir already contains model, allow to override?
+            default = False
+        """
         if net_dir[-1] != '/': net_dir += '/'
         to_save = {'mask': self.mask, 'scaler': self.scaler,
                    'basis': self.basis}
@@ -165,6 +221,12 @@ class Force_Network():
             self.model.save(net_dir + 'force_' + self.species)
 
     def load_all(self, net_dir):
+        """ Load force MLCF from net_dir
+
+        Parameters:
+        ----------
+        net_dir: str, path to directory containing MLCF
+        """
         supp = pickle.load(open(net_dir + 'supp_' + self.species, 'rb'))
         self.model = keras.models.load_model(net_dir + 'force_' + self.species)
         self.mask = supp['mask']
@@ -173,6 +235,17 @@ class Force_Network():
         self.compiled = True
 
     def learning_curve(self, steps = 5):
+        """Create a learning curve by varying the training set size
+
+        Parameters:
+        -----------
+        steps: int, how many different training set sizes to use
+
+        Returns:
+        ---------
+
+        dict = {'N': training set size,'train': training loss,'valid': validation loss}
+        """
         tot_len = len(self.X_train)
         save_X, save_y = np.array(self.X_train), np.array(self.y_train)
         chunk_size = np.floor(tot_len/steps).astype(int)
@@ -196,6 +269,18 @@ class Force_Network():
         return {'N': N, 'train': train_rmse, 'valid': valid_rmse}
 
     def predict_from_hdf5(self, path):
+        """ Get force prediction but instead of providing features,
+        give source path where features are found
+
+        Parameters:
+        ----------
+        path:  path to .hdf5 file containing features
+
+        Returns:
+        -------
+        np.ndarray, force prediction
+
+        """
         elfs, angles = elf.utils.hdf5_to_elfs_fast(path)
         if self.species in elfs:
             species = self.species
@@ -210,6 +295,14 @@ class Force_Network():
 
 
 def load_force_model(net_dir, species):
+    """ Load force MLCF from net_dir for a given element
+
+    Parameters:
+    ----------
+    net_dir: str, path to directory containing MLCF
+    species: str, specifies which chemical element to load model for
+    """
+    
     model = Force_Network(species, None, None, mask = [True])
     model.load_all(net_dir)
     return model

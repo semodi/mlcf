@@ -131,14 +131,3 @@ def initialize_uninitialized(sess):
     # print([str(i.name) for i in not_initialized_vars]) # only for testing
     if len(not_initialized_vars):
         sess.run(tf.variables_initializer(not_initialized_vars))
-
-def get_batch_feed(feed_dict, start, batch_size):
-
-    batch_feed_dict = {}
-    for key in feed_dict:
-        if feed_dict[key].ndim == 2:
-            batch_feed_dict[key] = feed_dict[key][start:batch_size]
-        else:
-            batch_feed_dict[key] = feed_dict[key][:, start:batch_size, :]
-
-    return batch_feed_dict
