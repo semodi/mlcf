@@ -1,6 +1,6 @@
 import sys
 import os
-from mlc_func import Timer
+from mlc_func.timer import Timer
 import time
 import numpy as np
 import pickle

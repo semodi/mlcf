@@ -3,7 +3,7 @@
 import numpy as np
 import struct
 from ase.units import Bohr
-from mlc_func.elf.real_space.density import Density
+from mlc_func.elf import Density
 from ase import Atoms
 import re
 

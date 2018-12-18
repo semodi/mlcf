@@ -17,10 +17,13 @@ from matplotlib import pyplot as plt
 import math
 import pickle
 from collections import namedtuple
+import h5py
+import json
+from ase.io import read
 Dataset = namedtuple("Dataset", "data species")
 
 
-class Network():
+class Energy_Network():
 
     def __init__(self, subnets):
 
@@ -62,7 +65,7 @@ class Network():
     def __mod__(self, other):
         if isinstance(other, Subnet):
             self.subnets += [[other]]
-        elif isinstance(other, Network):
+        elif isinstance(other, Energy_Network):
             self.subnets += other.subnets
         else:
             raise Exception("Datatypes not compatible")
@@ -531,13 +534,13 @@ class Subnet():
         if not isinstance(other,Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Network([[self,other]])
+            return Energy_Network([[self,other]])
 
     def __mod__(self, other):
         if not isinstance(other,Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Network([[self],[other]])
+            return Energy_Network([[self],[other]])
 
 
     def get_feed(self, which, train_valid_split = 0.8, seed = None):
@@ -693,7 +696,7 @@ class Subnet():
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
 
-def load_network(path):
+def load_energy_model(path):
     """ Load energy MLCF
 
     Parameters:
@@ -704,6 +707,100 @@ def load_network(path):
     -------
     Network (energy MLCF)
     """
-    network = Network([])
+    network = Energy_Network([])
     network.load_all(path)
     return network
+
+def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
+    filters = [], autofilt_percent = 0, test_size = 0.2):
+
+    ''' Return a trainable energy MLCF (neural network)
+
+    Parameters:
+    ----------
+
+    feature_src: list; list of paths to the hdf5 containing the features
+    target_src: list; list of paths to the csv files containing the target energies
+                entries in target_scr and feature_src correspond to each other
+    masks: dict containing list booleans; can be used to select which features to use.
+        keys specify the atomic species.
+        default: use all features
+    automask_std: float, if mask not set exclude all features whose stdev across dataset
+        is smaller than this value
+
+    filters: list containing list of booleans; can be used to exclude datapoints
+        in sets (e.g. outliers)
+
+    autofilt_percent: float, exclude this percentile of extreme datapoints from set
+            (only if filters not set)
+    test_size: float, relative size of hold_out (test) set
+    '''
+
+    if not len(feature_src) == len(target_src):
+        raise Exception('Please provided only one target location for each feature set')
+
+    sets = []
+    if len(filters) != len(feature_src):
+        filters = [0]*len(feature_src)
+
+    no_mask = False
+
+    for fsrc, tsrc, filter in zip(feature_src, target_src, filters):
+
+        elfs, _ = elf.utils.hdf5_to_elfs_fast(fsrc)
+
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+
+        if not isinstance(filter, list) and not isinstance(filter, np.ndarray):
+
+            percentile_cutoff = autofilt_percent
+            lim1 = np.percentile(targets, percentile_cutoff*100)
+            lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+            min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+            filter = (targets > min_lim) & (targets < max_lim)
+
+        if len(masks) != len(elfs):
+            no_mask = True
+            for species in elfs:
+                feat = np.array(elfs[species])
+                masks[species] = (np.std(feat.reshape(-1,feat.shape[-1]),
+                        axis = 0) > automask_std)
+
+        targets = targets[filter]
+        subnets = []
+        for species in elfs:
+            feat = np.array(elfs[species])[:,:,masks[species]]
+            feat = feat[filter]
+            for j in range(feat.shape[1]):
+                subnets.append(Subnet())
+                subnets[-1].add_dataset(Dataset(feat[:,j:j+1], species),
+                    targets, test_size = 0.2)
+
+        sets.append(subnets)
+    network = Network(sets)
+    network.masks = masks
+    return network
+
+def get_energy_filters(target_src, autofilt_percent = 0):
+    """ For a given energy target dataset return filter that cutoff the
+    upper and lower percentile specified in autofilt_percent
+
+    Parameters:
+    ----------
+    target_src, str, path of csv file containing energy targets
+    autofilt_percent, float, percentile to cut off
+
+    Returns:
+    --------
+    list of bool, filters
+    """
+    filters = []
+    for tsrc in target_src:
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+        percentile_cutoff = autofilt_percent
+        lim1 = np.percentile(targets, percentile_cutoff*100)
+        lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+        min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+        filter = (targets > min_lim) & (targets < max_lim)
+        filters.append(filter)
+    return filters

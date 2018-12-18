@@ -1,4 +1,3 @@
-from .network import Network, Subnet, Dataset
 import mlc_func.elf as elf
 import numpy as np
 import pandas as pd
@@ -6,12 +5,14 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras import regularizers
 import keras
-from sklearn.preprocessing import MinMaxScaler, Normalizer,StandardScaler
-from sklearn.kernel_ridge import KernelRidge as KRR
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import os
 import pickle
+import h5py
+import json
+from ase.io import read
 
 class Force_Network():
     """ MLCF for force perdiction"""
@@ -302,7 +303,130 @@ def load_force_model(net_dir, species):
     net_dir: str, path to directory containing MLCF
     species: str, specifies which chemical element to load model for
     """
-    
+
     model = Force_Network(species, None, None, mask = [True])
     model.load_all(net_dir)
     return model
+
+def build_force_mlcf(feature_src, target_src, traj_src, species, mask = [], filters = [],
+    automask_std = 0, autofilt_percent = 0, test_size = 0.2,
+    random_state = 42):
+    ''' Return a trainable force MLCF (neural network)
+
+    Parameters:
+    ----------
+
+    feature_src: list; list of paths to the hdf5 containing the features
+    target_src: list; list of paths to the csv files containing the target forces
+                entries in target_scr and feature_src correspond to each other
+    traj_src: list; list of paths to the .traj/.xyz files (needed to determine species
+                of each atom)
+    species: string; containing the species that model should be fitted for
+    mask: list containing booleans; can be used to select which features to use.
+        default: use all features
+    filters: list containing list of booleans; can be used to exclude datapoints
+        in sets (e.g. outliers)
+    automask_std: float, if mask not set exclude all features whose stdev across dataset
+        is smaller than this value
+    autofilt_percent: float, exclude this percentile of extreme datapoints from set
+            (only if filters not set)
+    test_size: float, relative size of hold_out (test) set
+    random_state: int, state used to perform shuffle before spliting dataset
+    '''
+
+    species = species.lower()
+    if not len(species) == 1:
+        raise Exception('Please specify only one species.')
+    all_targets = []
+    all_features = []
+
+    if len(filters) != len(feature_src):
+        filters = [0]*len(feature_src)
+
+    basis = {}
+
+    for fsrc, tsrc, trsrc, filter in zip(feature_src, target_src, traj_src, filters):
+        # elfs = np.array(elf.utils.hdf5_to_elfs(fsrc,
+        #                       grouped = True, values_only = True)[species])
+        # angles = np.array(elf.utils.hdf5_to_elfs(fsrc,
+        #                       grouped = True, angles_only = True)[species])
+        elfs, angles = elf.utils.hdf5_to_elfs_fast(fsrc, species)
+        elfs = elfs[species]
+        angles = angles[species]
+        with h5py.File(fsrc) as file:
+            this_basis = json.loads(file.attrs['basis'])
+            # Filter for species
+            species_basis = {}
+            for entry in this_basis:
+                if entry[-1] == species or\
+                 entry == 'alignment':
+                 species_basis[entry] = this_basis[entry]
+
+            if len(basis) > 0 and species_basis != basis:
+                raise Exception('Basis used across datasets not consistent')
+            else:
+                basis = species_basis
+
+        angles = angles.reshape(-1,3)
+
+        elfs = elfs.reshape(-1,elfs.shape[-1])
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+        if not trsrc.split('.')[-1] in ['xyz', 'traj']:
+            raise Exception('Invalid file format for trajectory file stored at {}'.format(trsrc))
+        traj = read(trsrc, ':')
+
+        all_symbols = np.array([t.get_chemical_symbols() for t in traj]).flatten()
+        targets = targets[all_symbols == species.upper()]
+
+        print(elfs.shape)
+        for idx, (t, ang) in enumerate(zip(targets, angles)):
+            targets[idx] = elf.geom.rotate_vector(np.array([t]),ang.tolist(), inverse=True)
+
+        if not len(elfs) == len(targets):
+            raise Exception('Sample sizes inconsistent.')
+
+        if not isinstance(filter, list) and not isinstance(filter, np.ndarray):
+            percentile_cutoff = autofilt_percent
+            selection = []
+            for t in targets.T:
+                lim1 = np.percentile(t, percentile_cutoff*100)
+                lim2 = np.percentile(t, (1 - percentile_cutoff)*100)
+                min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+                selection.append((t > min_lim) & (t < max_lim))
+
+            filter = [s1 & s2 & s3 for s1,s2,s3 in zip(*selection)]
+
+        if len(mask) != elfs.shape[-1]:
+            feat = np.array(elfs)
+            mask = (np.std(feat.reshape(-1,feat.shape[-1]),
+                        axis = 0) > automask_std)
+        all_features.append(elfs[:,mask][filter])
+        all_targets.append(targets[filter])
+
+    feat = np.concatenate(all_features)
+    targets = np.concatenate(all_targets)
+
+    scaler = StandardScaler()
+    scaler.fit(feat)
+    feat = scaler.transform(feat)
+
+    X_train, X_test, y_train, y_test = train_test_split(feat,
+                                                    targets,
+                                                    shuffle =True,
+                                                    random_state = random_state,
+                                                    test_size = test_size)
+
+    X_train, X_valid, y_train, y_valid = train_test_split(X_train,
+                                                          y_train,
+                                                          shuffle =True,
+                                                          random_state = random_state,
+                                                          test_size = 0.2)
+    datasets = {
+        'X_train': X_train,
+        'X_test': X_test,
+        'X_valid': X_valid,
+        'y_train': y_train,
+        'y_test': y_test,
+        'y_valid': y_valid
+    }
+    return Force_Network(species, scaler, basis, datasets, mask)

@@ -10,7 +10,7 @@ import ipyparallel as ipp
 import re
 import pandas as pd
 from mlc_func.elf.siesta import get_density, get_density_bin, get_atoms, get_forces, get_energy
-from mlc_func.elf.real_space import get_elfs_oriented, orient_elfs
+from .real_space import get_elfs_oriented, orient_elfs
 from mlc_func.elf.geom import make_complex, rotate_tensor
 from .serial_view import serial_view
 

@@ -12,7 +12,7 @@ from mlc_func.elf.geom import get_nncs_angles, get_elfcs_angles
 from mlc_func.elf.geom import make_real, rotate_tensor, fold_back_coords
 from mlc_func.elf import ElF
 from mlc_func.elf.serial_view import serial_view
-from mlc_func import Timer
+from mlc_func.timer import Timer
 from mlc_func.elf.water import get_water_angles
 
 def mesh_around(pos, radius, density, unit = 'A'):

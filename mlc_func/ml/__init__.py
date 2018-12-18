@@ -1,7 +1,5 @@
 """ This module contains everything regarding machine learning
 """
-from .functional import build_energy_mlcf, get_energy_filters
-from .functional import build_force_mlcf
-from .force_network import Force_Network, load_force_model
-from .network import load_network
-from .ensemble_network import Ensemble_Network, load_ensemble_network
+from .force_network import build_force_mlcf, load_force_model
+from .energy_network import build_energy_mlcf, load_energy_model
+from .ensemble_network import load_ensemble_network

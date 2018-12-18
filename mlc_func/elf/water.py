@@ -1,3 +1,4 @@
+from mlc_func.elf.geom import get_euler_angles
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from ase.io import read, write
@@ -9,14 +10,42 @@ qh = -0.5564
 qm = -2*qh
 r_om = 0.1546
 
+def get_water_angles(i, coords, tensor = None):
+    """ Get euler angles to rotate to the water molecule centered CS for
+        coords[i]. (Assumes that ordering in coords is OHHOHH...)
+    """
+
+    def normalize(vec):
+        return vec/np.linalg.norm(vec, axis = -1)
+
+    mol_idx = int(np.floor(i/3))
+    mol_coords = coords.reshape(-1,3,3)[mol_idx]
+
+    if i%3 == 2:
+        mol_coords[[1,2]] = mol_coords[[2,1]]
+    O = mol_coords[0]
+    mol_coords -= O
+    axis2 = normalize(normalize(mol_coords[1]) + normalize(mol_coords[2]))
+    axis3 = normalize(np.cross(axis2,mol_coords[1]))
+    axis1 = normalize(np.cross(axis2, axis3))
+
+    # Round to avoid problems in arccos of get_euler_angles()
+    axis1 = axis1.round(10)
+    axis2 = axis2.round(10)
+    axis3 = axis3.round(10)
+
+    angles = get_euler_angles(np.array([axis1, axis2, axis3]))
+
+    return angles
+
 def waterc_to_tip4p(coords):
-    """ Starting from water coordinates, return the     
+    """ Starting from water coordinates, return the
     parameters of a tip4p model describing the same system
     """
     norm = np.linalg.norm
     if coords.ndim == 2:
         coords = coords.reshape(-1,3,3)
-    
+
     oh1 = coords[:,1,:] - coords[:,0,:]
     oh2 = coords[:,2,:] - coords[:,0,:]
     oh1 = oh1/norm(oh1, axis = -1).reshape(-1,1)
@@ -24,39 +53,38 @@ def waterc_to_tip4p(coords):
     bisec = (oh1 + oh2)
     bisec = bisec/norm(bisec, axis = -1).reshape(-1,1)
     m = coords[:,0] + bisec*r_om
-    
+
     # Find molecular plane
 
     axis1 = np.cross(bisec,oh1)
     axis1 /= norm(axis1, axis = -1).reshape(-1,1)
     axis2 = np.cross(bisec, axis1)
     assert np.allclose(norm(axis2, axis = -1), np.zeros(len(axis2)) + 1)
-    
-    
+
+
     h2 = np.cos(ang/2)*bisec + np.sin(ang/2)*axis2 + coords[:,0]
     h1 = np.cos(ang/2)*bisec - np.sin(ang/2)*axis2 + coords[:,0]
     h1 = np.concatenate([h1,np.zeros(len(h1)).reshape(-1,1) + qh], axis = -1)
     h2 = np.concatenate([h2,np.zeros(len(h1)).reshape(-1,1) + qh], axis = -1)
     m = np.concatenate([m,np.zeros(len(m)).reshape(-1,1) + qm], axis = -1)
     return np.concatenate([m,h1,h2], axis =  -1).reshape(-1,3,4)
-    
+
 def tip4p_to_str(arr):
-    """ Giving a tip4p array (created with waterc_to_tip4p) return 
-    a string that can be used inside a SIESTA input file 
+    """ Giving a tip4p array (created with waterc_to_tip4p) return
+    a string that can be used inside a SIESTA input file
     """
     siesta_str = '%block Geometry.Charge \n'
-    
-    # M 
-    n_mol = len(arr) 
-    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,0,3]*n_mol, n_mol) 
+
+    # M
+    n_mol = len(arr)
+    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,0,3]*n_mol, n_mol)
     for c in arr[:,0,:3]:
         siesta_str += ' {:5.4f} {:5.4f} {:5.4f} Ang \n'.format(*c)
-    
-    # H    
-    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,1,3]*2*n_mol, 2*n_mol) 
+
+    # H
+    siesta_str += 'coords {} \n exp 0.05 0.15 Ang \n {} spheres \n'.format(arr[0,1,3]*2*n_mol, 2*n_mol)
     for c in arr[:,1:,:3].reshape(-1,3):
         siesta_str += ' {:5.4f} {:5.4f} {:5.4f} Ang \n'.format(*c)
-        
+
     siesta_str += '%endblock Geometry.Charge \n'
     return siesta_str
-
