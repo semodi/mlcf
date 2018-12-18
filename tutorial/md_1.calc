@@ -1,0 +1,9 @@
+# Location fo the MLCF model
+model ../model/
+
+# Basis set for SIESTA calculations (sz=Single zeta basis)
+basis SZ
+
+# XC-functional for SIESTA calculations
+xcfunctional PBE
+

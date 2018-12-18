@@ -33,8 +33,17 @@ def single_thread(atoms_list, calcfile, env):
     return results
 
 class ListIntegrator():
+    """ This is not really an ase integrator (but it can be used like one). Instead
+    of integrating the equations of motion it simply loops through a set of configurations.
+    It can therefore be used to generate datasets that are then used to train MLCFs.
+    """
 
-    def __init__(self, atoms, calcfile, np):
+    def __init__(self, atoms, calcfile):
+        """
+        Parameters:
+        atoms: list of ase.Atoms, configurations to calculate
+        calcfile: an file that defines the calculator which should be used
+        """
         settings, _ = read_input(calcfile)
         self.atoms = atoms
         self.calcfile = calcfile
@@ -51,6 +60,9 @@ class ListIntegrator():
         self.atoms_threaded = [atoms_indexed[n::n_workers] for n in range(n_workers)]
 
     def run(self, _):
+        """
+        Run the ListIntegrator until all configurations are calculated
+        """
         env = dict(os.environ)
         self.view.map_sync(single_thread, self.atoms_threaded,
                 [self.calcfile]*len(self.atoms_threaded),

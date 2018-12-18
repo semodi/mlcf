@@ -31,6 +31,8 @@ from .siesta_basis import basis_sets
 
 def log_all(energy_siesta = None, energy_corrected = None,
      forces_siesta=None, forces_corrected=None, features=None):
+    ''' Used to log energies, forces and features during MD simultation
+    '''
     if energy_siesta == None: #Initialize
         with open('energies.dat', 'w') as file:
             file.write('Siesta \t Corrected \n')
@@ -51,10 +53,18 @@ def log_all(energy_siesta = None, energy_corrected = None,
                 np.savetxt(file, features[key], fmt = '%.4f')
 
 class Siesta_Calculator(Siesta):
-    """ Provides default option for the Siesta calculator
+    """ Provides default options for the Siesta calculator, such as pre-defined
+    custom basis sets and functionals.
     """
 
     def __init__(self, basis = 'qz', xc='BH'):
+        '''
+
+        Parameters:
+        ----
+        basis: {'dz_custom','dz','qz_custom','sz','uf','szp'}, str, basis set to be used
+        xc: {'PBE','BH','PW92','revPBE', ...}, str, xc-functional
+        '''
 
         label = 'H2O' #TODO: for now, change later
         if xc =='REVPBE': xc = 'revPBE'
@@ -105,6 +115,12 @@ class Siesta_Calculator(Siesta):
 
 
     def set_solution_method(self, method):
+        ''' Whether diagonalization or orbital minimization should be used.
+        Parameters:
+        ---
+        method: {'diagon','OMM'}, str
+        '''
+
         if not method.lower() == 'diagon' and not method.upper() == 'OMM':
             raise Exception('Invalid solution method: choose "diagon" or "OMM"')
         else:
@@ -123,9 +139,19 @@ class Siesta_Calculator(Siesta):
         self.read_forces_stress()
 
 class MLCF_Calculator:
+    ''' MLCF_Calculator that consists of a baseline calculator (base_calculator), e.g. Siesta,
+        and a Machine learned correcting functional (MLCF).
+    '''
 
     def __init__(self, base_calculator = None, feature_getter = None,
                     log_accuracy = True):
+        '''
+        Parameters:
+        ---
+        base_calculator: ase.Calculator, baseline method to get first approximation to forces
+        feature_getter: FeatureGetter, read the electron density and transforms it into features (electronic fingerprints)
+        log_accuracy: bool, whether to log energies, forces and features during MD simulation, default: True
+        '''
 
         self.force_models = {}
         self.last_positions = None
@@ -139,9 +165,22 @@ class MLCF_Calculator:
             log_all()
 
     def set_force_model(self, models):
+        ''' Sets the force MLCF
+        Parameters:
+        ---
+        models: dict, dictionary containing the force models, dict keys should correspond to
+        element symbol
+        '''
+
         self.force_models = models
 
     def set_feature_getter(self,feature_getter):
+        ''' Sets the feature_getter
+        Parameters:
+        ---
+        feature_getter: FeatureGetter
+        '''
+
         self.feature_getter = feature_getter
 
     def calculation_required(self, atoms, quantities = None):
@@ -151,7 +190,14 @@ class MLCF_Calculator:
             return True
 
     def set_base_calculator(self, base_calculator):
+
+        ''' Sets the baseline calculator
+        Parameters:
+        ---
+        base_calculator: ase.Calculator, any calulator can be used (only tested for Siesta calculator)
+        '''
         self.base_calculator = base_calculator
+
     def get_potential_energy(self, atoms, force_consistent = False):
         if self.calculation_required(atoms):
             time_step = Timer("TIME_FULL_STEP")
@@ -237,6 +283,9 @@ class MLCF_Calculator:
         return self.forces
 
 def load_from_file(input_file):
+    ''' Read input_file that defines baseline calculator and MLCF model
+        and return MLCF_Calculator
+    '''
     settings, mixing_settings = read_input(input_file)
 
     if settings['mixing']:
@@ -284,9 +333,10 @@ def load_from_file(input_file):
     return calc
 
 def load_mlcf(model_path, client = None):
-    """ Given a directory model_path load and return the a calculator that uses
-    the MLCF containes in that directory, for parallel computing an ipyparallel
-    client can be provided
+    """ Given a directory model_path load and return a calculator that uses
+    the MLCF contained in that directory, for parallel computing an ipyparallel
+    client can be provided. The baseline calculator of the returned instance
+    still has to be set before usage.
     """
 
     if not model_path[-1] == '/': model_path += '/'

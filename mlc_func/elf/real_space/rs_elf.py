@@ -49,11 +49,23 @@ def mesh_around(pos, radius, density, unit = 'A'):
 
     return Xm, Ym, Zm
 
-def box_around(pos, radius, density, unit = 'A'):
+def box_around(pos, radius, density):
     '''
     Return dictionary containing box around an atom at position pos with
     given radius. Dictionary contains box in mesh, euclidean and spherical
     coordinates
+
+    Parameters:
+    ---
+
+    pos: np.ndarray (3) or (1,3), coordinates for box center
+    radius: float, box radius
+    density: Density, only needed for Density.unitcell and Density.grid
+
+    Returns:
+    ---
+
+    dict, box in mesh, euclidean and spherical coordinates
     '''
 
     if pos.shape != (1,3) and (pos.ndim != 1 or len(pos) !=3):
@@ -286,13 +298,11 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     basis_species = np.unique([b[-1] for b in basis\
         if b[-2] == '_'])
 
-    time_all = Timer('TIME_GET_ELFS')
     density_list = []
     pos_list = []
     sym_list = []
     basis_list = []
     indices_list = []
-    time_setup = Timer('TIME_GET_ELFS_SETUP')
     n_workers = len(view)
     spec_filt = [sp.lower() in basis_species for sp in atoms.get_chemical_symbols()]
     for pos, sym, idx in zip(distribute_workload(atoms.get_positions()[spec_filt], n_workers),
@@ -314,7 +324,6 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
             sym_list[-1].append(s)
             basis_list[-1].append(basis)
             indices_list[-1].append(i)
-    time_setup.stop()
 
     n_jobs = len(basis_list)
     all_pos = atoms.get_positions()
@@ -323,7 +332,6 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
       basis_list, sym_list, indices_list,[all_pos]*n_jobs,
       [orient_mode]*n_jobs)
 
-    time_flatten  = Timer("TIME_FLATTEN_LIST")
     elfs_flat = []
 
     max_len = len(elfs[0])
@@ -337,8 +345,6 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
             continue
         break
 
-    time_flatten.stop()
-    time_all.stop()
     return elfs_flat
 
 def get_elfs_oriented(atoms, density, basis, mode, view = serial_view()):
@@ -363,7 +369,14 @@ def orient_elf(i, elf, all_pos, mode):
     all_pos: numpy.ndarray; positions of all atoms in system (including the
     one with index i)
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
-                'nn': Use nearest neighbor algorithm}
+                'nn': Use nearest neighbor algorithm},
+                'water': molecular alignment (can only be used for neat water),
+                'neutral': keep alignment unchanged
+
+    Returns:
+    --------
+
+    ElF, oriented version of elf
     """
     oriented_elfs = []
     if mode == 'elf':

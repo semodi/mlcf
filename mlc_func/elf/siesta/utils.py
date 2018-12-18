@@ -44,17 +44,11 @@ def get_density(file_path):
 
     Parameters:
     -----------
-    file_path: string; path to RHO file from which density is read
+    file_path: string; path to RHO (or RHOXC) file from which density is read
 
     Returns:
     --------
-    None
-
-    Other:
-    ------
-    unitcell: (3,3) np.array; saves the unitcell dimension in euclidean coordinates
-    grid: (,3) np.array; number of grid points in each euclidean direction
-    rho: (grid[1],grid[2],grid[3]) np.array; density on grid
+    Density
     """
     rhopath = file_path
     unitcell = np.zeros([3, 3])
@@ -104,7 +98,7 @@ def get_energy(path, keywords=['Total']):
     return values
 
 def get_forces(path, n_atoms = -1):
-    """find forces in siesta .out file
+    """find forces in siesta .out file for first n_atoms atoms
     """
     with open(path, 'r') as infile:
         infile.seek(0)
@@ -127,7 +121,7 @@ def get_forces(path, n_atoms = -1):
 
 
 def get_atoms(path, n_atoms = -1):
-    """find atomic data in siesta .out file and return as ase Atoms object
+    """find atomic data in siesta .out file for first n_atoms atoms and return as ase Atoms object
     """
     def find_coords(path):
         with open(path, 'r') as infile:
@@ -171,7 +165,7 @@ def get_atoms(path, n_atoms = -1):
     coords = find_coords(path)
     for c in coords:
         atom_string += chem_species[int(c[3])]
-    if n_atoms == -1: n_atoms = len(atom_string) 
+    if n_atoms == -1: n_atoms = len(atom_string)
     atom_string = atom_string[:n_atoms]
     coords = coords[:n_atoms]
     atoms = Atoms(atom_string, positions = coords[:,:3])

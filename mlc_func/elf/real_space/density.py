@@ -1,6 +1,13 @@
 import numpy as np
 class Density():
+    """ Class defining the density on a real space grid
+    """
     def __init__(self, rho, unitcell, grid):
+        """
+        rho: np.ndarray (?,?,?), 3-dim real space density
+        unitcell: np.ndarray (3,3), unitcell in Angstrom
+        grid: np.ndarray(3,), grid points
+        """
         if rho.ndim != 3:
             raise Exception('rho.ndim = {}, expected: 3'.format(rho.ndim))
         if unitcell.shape != (3,3):
@@ -17,7 +24,7 @@ class Density():
 
             Parameters
             ----------
-            rmin, rmax: (3) list; lower and upper cutoff
+            rmin, rmax: (3) list; lower and upper cutoff in every euclidean direction
             scaled: boolean; scale the meshes with unitcell size?
             pbc: boolean, assume periodic boundary conditions
             indexing: 'xy' or 'ij'; indexing scheme used by np.meshgrid

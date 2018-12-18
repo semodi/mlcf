@@ -42,7 +42,16 @@ def make_real(tensor):
     return np.array(tensor_real)
 
 def make_complex(tensor_array, n_rad, n_l):
+    """
+    Take real tensors provided as a np.ndarray and convert them into
+    complex tensors represented as a dictionary
 
+    Parameters:
+    ---
+    tensor_array: np.ndarray, real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
+    n_rad: int, number of radials
+    n_l: int, maximum angular momentum
+    """
     tensor = {}
     tensor_complex = {}
     cnt = 0
@@ -63,7 +72,11 @@ def make_complex(tensor_array, n_rad, n_l):
     return tensor_complex
 
 def get_casimir(tensor):
-    """ Get the casimir element (equiv. to L_2 norm) of a tensor
+    """ Get the casimir element (equiv. to L_2 norm) of a complex tensor
+    Parameters:
+    ---
+
+    tensor: dict, dictionary containing tensor in its complex form
     """
     casimir = {}
 
@@ -111,7 +124,24 @@ def get_euler_angles(co):
 def rotate_vector(vec, angles, inverse = False):
     """ Rotate a real vector (euclidean order: xyz) with euler angles
         inverse = False: rotate vector
-        inverse = True: rotate CS"""
+        inverse = True: rotate CS
+
+    Parameters:
+    ---
+    vec: np.ndarray (?, 3), vector(s) to rotate, note that if more than one vector provided,
+        everyone is rotated by the same angles
+
+    angles: np.ndarray (3), euler angles: alpha, beta, gamma
+
+    inverse: bool, {False: rotate vector, True: rotate CS}
+
+    Returns:
+    ---
+    np.ndarray, rotated vector(s)
+    """
+
+    if vec.ndim == 1 and len(vec) == 3:
+        vec = vec.reshape(1,3)
 
     vec = vec[:,[1,2,0]]
     T_inv = np.conj(T.T)
@@ -135,19 +165,20 @@ def rotate_tensor(tensor, angles, inverse = False):
 
     Parameters:
     ----------
-    tensor: dict; rank-2 tensor to rotate; the tensor is expected to be complete
+    tensor: dict; complex rank-2 tensor to rotate; the tensor is expected to be complete
         that is no entries should be missing
-    angles: euler angles, {alpha, beta, gamma}
-    inverse: boolen; inverse rotation
+    angles: np.ndarray (3), euler angles: alpha, beta, gamma
+    inverse: bool, {False: rotate vector, True: rotate CS}
 
     Returns:
     ---------
-    Rotated version of vec
+    Rotated version of tensor
 
     Info:
     -------
     Remember that in nncs and elfcs alignment, inverse = True should be used
     """
+
     if not isinstance(tensor['0,0,0'], np.complex128) and not isinstance(tensor['0,0,0'], np.complex64)\
         and not type(tensor['0,0,0']) == complex:
         raise Exception('tensor has to be complex')
@@ -181,7 +212,14 @@ def rotate_tensor(tensor, angles, inverse = False):
     return tensor_rotated
 
 def get_elfcs_angles(i, coords, tensor):
-    """Use the ElF algorithm to get angles relating global to local CS
+    """ Get angles relating global coordinate system to local coordinate system defined
+        by electronic structure
+
+        Parameters:
+        ---
+        i: int, LCS around atom i
+        coords: np.ndarray (?, 3), all atomic positions in given sytem
+        tensor: dict, complex tensor (electronic descriptor) to use for alignment
     """
 
     # Collect all p-orbitals as vectors
@@ -237,9 +275,17 @@ def get_elfcs_angles(i, coords, tensor):
     return angles
 
 def get_nncs_angles(i, coords, tensor = None):
-    """ Get euler angles to rotate to the local CS for coords[i] that is
-     oriented according to the nearest neighbor rule
+
+    """ Get angles relating global coordinate system to local coordinate system defined
+        by nearest neighbors
+
+        Parameters:
+        ---
+        i: int, LCS around atom i
+        coords: np.ndarray (?, 3), all atomic positions in given sytem
+        tensor: dummy
     """
+
 
     norm = np.linalg.norm
     c = np.array(coords[i])
@@ -277,8 +323,16 @@ def get_nncs_angles(i, coords, tensor = None):
 
 #TODO: Find faster implementation than recursion, non-ortho implementation
 def fold_back_coords(i, coords, unitcell):
-    """ Return the periodic images of coords in a unit-cell "unitcell"
-        that are closest to coords[i]"""
+    """ Return the periodic images of coords in a unit-cell
+        that are closest to coords[i]
+
+    Parameters:
+    ---
+
+    i: int, central atom
+    coords: np.ndarray (?, 3), all atomic positions in given sytem
+    unitcell: np.ndarray (3,3), unitcell in angstrom
+    """
 
     if not np.allclose(unitcell.astype(bool), np.eye(3).astype(bool)):
         raise Exception('fold_back_coords not implemented for non orthorhombic unitcells')

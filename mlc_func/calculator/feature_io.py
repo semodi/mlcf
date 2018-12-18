@@ -38,18 +38,38 @@ class FeatureGetter():
             self.n_clients = 1
 
 class DescriptorGetter(FeatureGetter):
+    """ Reads the real space electron density and returns electronic descriptors
+    """
 
-    def __init__(self, basis, client = None):
+    def __init__(self, basis, client = None, rhopath='./H2O.RHOXC'):
+        """
+        Parameters:
+        ---
+        basis: dict, dictionary defining the basis
+        client: ipyparallel client for parallel processing
+        rhopath: path under which the electron density can be found after every MD step
+        """
         super().__init__(client = client)
+        self.rhopath = rhopath
         self.basis = basis
         self.scalers = {}
         self.method = basis['alignment']
         self.masks = {}
 
     def set_scalers(self, scalers):
+        """
+        scalers: dictionary, dictionary containing the scalers that are used to transform
+            the electronic descriptors before feeding them to the neural network,
+            dict keys correspond to element symbols
+        """
         self.scalers = scalers
 
     def set_masks(self, masks):
+        """
+        scalers: dictionary, dictionary containing the masks that are applied to
+            the electronic descriptors before feeding them to the neural network,
+            dict keys correspond to element symbols
+        """
         self.masks = masks
 
     def get_features(self, atoms):
@@ -59,13 +79,11 @@ class DescriptorGetter(FeatureGetter):
             if s not in self.masks:
                 self.masks[s] = [True]*1000
 
-        density = elf.siesta.get_density_bin('./H2O.RHOXC')
+        density = elf.siesta.get_density_bin(self.rhopath)
 
         elfs = elf.real_space.get_elfs_oriented(atoms, density,
                 self.basis, self.method, self.view)
 
-        # TODO: this is not ideal
-        time_split = Timer('TIME_SPLIT')
         elfs_dict = {}
         angles_dict = {}
         for e in elfs:
@@ -75,7 +93,6 @@ class DescriptorGetter(FeatureGetter):
             elfs_dict[e.species].append(e.value[self.masks[e.species.lower()][:len(e.value)]])
             angles_dict[e.species].append(e.angles)
 
-        time_split.stop()
         for symbol in elfs_dict:
             try:
                 elfs_dict[symbol] = self.scalers[symbol.lower()].transform(np.array(elfs_dict[symbol]))

@@ -15,6 +15,18 @@ from mlc_func.elf.geom import make_complex, rotate_tensor
 from .serial_view import serial_view
 
 def get_view(profile = 'default', n = -1):
+    """
+    Load ipyparallel balanced_view
+
+    Parameters:
+    ---
+    profile: str, ipyparallel profile, default='default'
+    n: int, use n workers, default=-1 (use all workers)
+
+    Returns:
+    ----
+    ipyparallel.balanced_view
+    """
     client = ipp.Client(profile = profile)
     # view = client.load_balanced_view()
     if n == -1:
@@ -34,7 +46,6 @@ def __get_elfs(path, atoms, basis, method):
 
 
 def __get_all(paths, method, basis, add_ext, dens_ext, n_atoms):
-
 
     atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths],[n_atoms]*len(paths)))
     elfs = list(map(__get_elfs, [p + '.' + dens_ext for p in paths],

@@ -1,4 +1,7 @@
 class serial_view():
+    """
+    Serial view that can be used like an ipyparallel balanced_view()
+    """
     def __init__(self):
         pass
 
