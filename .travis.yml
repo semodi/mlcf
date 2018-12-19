@@ -25,7 +25,7 @@ install:
   - conda info -a
   - pip install codecov
   - pip install pytest-cov
-  - pip install pytest
+  - conda install pytest
   - conda install tensorflow
   - conda install -c moble spherical_functions
   - conda list
