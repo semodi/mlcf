@@ -11,8 +11,6 @@ if __name__ == "__main__":
         license='BSD-3C',
         packages=setuptools.find_packages(),
         python_requires='>=3.2',
-        dependency_links=['git+git://github.com/moble/quaternion',
-                          'git+git://github.com/moble/spherical_functions'],
         install_requires=[
             'numpy',
             'sympy',
@@ -26,8 +24,6 @@ if __name__ == "__main__":
             'cython',
             'tensorflow',
             'keras',
-            'quaternion',
-            'spherical_functions'
         ],
         extras_require={
             'docs': [
