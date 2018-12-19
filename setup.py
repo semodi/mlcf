@@ -10,7 +10,7 @@ if __name__ == "__main__":
         url="",
         license='BSD-3C',
         packages=setuptools.find_packages(),
-        python_requires='>=3.6',
+        python_requires='>=3.2',
         dependency_links=['git+git://github.com/moble/quaternion',
                           'git+git://github.com/moble/spherical_functions'],
         install_requires=[
