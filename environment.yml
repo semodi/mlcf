@@ -61,7 +61,6 @@ dependencies:
     - markdown==3.0.1
     - markupsafe==1.1.0
     - matplotlib==3.0.2
-    - mlc-func==0.1.1
     - mpmath==1.1.0
     - numba==0.41.0
     - numpy-quaternion==2018.3.7.1.24.10
