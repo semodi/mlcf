@@ -1,0 +1,2 @@
+-e git+git://github.com/moble/quaternion#egg=quaternion
+-e git+git://github.com/moble/spherical_functions#egg=spherical_functions
