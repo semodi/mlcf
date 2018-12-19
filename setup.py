@@ -31,7 +31,7 @@ if __name__ == "__main__":
         ],
         extras_require={
             'docs': [
-                'sphinx==1.8.2',  # autodoc was broken in 1.3.1
+                'sphinx==1.7',  # autodoc was broken in 1.3.1
                 'sphinxcontrib-napoleon',
                 'sphinx_rtd_theme',
                 'numpydoc',
