@@ -10,7 +10,7 @@ Welcome to mlc_func's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   module_doc
 
 Indices and tables
 ==================
