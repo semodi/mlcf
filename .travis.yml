@@ -25,6 +25,7 @@ install:
   - conda info -a
   - pip install codecov
   - pip install pytest-cov
+  - conda install tensorflow
   - conda list
 
 before_script:
