@@ -1,13 +1,19 @@
 import numpy as np
 class Density():
     """ Class defining the density on a real space grid
+
+    Parameters
+    ----------
+
+        rho: np.ndarray
+            3-dim real space density.
+        unitcell: np.ndarray (3,3)
+         unitcell in Angstrom.
+        grid: np.ndarray (3,)
+         grid points.
+
     """
     def __init__(self, rho, unitcell, grid):
-        """
-        rho: np.ndarray (?,?,?), 3-dim real space density
-        unitcell: np.ndarray (3,3), unitcell in Angstrom
-        grid: np.ndarray(3,), grid points
-        """
         if rho.ndim != 3:
             raise Exception('rho.ndim = {}, expected: 3'.format(rho.ndim))
         if unitcell.shape != (3,3):
@@ -19,19 +25,26 @@ class Density():
         self.grid = grid
 
     def mesh_3d(self, rmin=[0, 0, 0], rmax=0, scaled = False, pbc = True, indexing = 'xy'):
+        """
+        Returns a 3d mesh taking into account periodic boundary conditions
 
-        """Returns a 3d mesh taking into account periodic boundary conditions
+        Parameters
+        ----------
 
-            Parameters
-            ----------
-            rmin, rmax: (3) list; lower and upper cutoff in every euclidean direction
-            scaled: boolean; scale the meshes with unitcell size?
-            pbc: boolean, assume periodic boundary conditions
-            indexing: 'xy' or 'ij'; indexing scheme used by np.meshgrid
+        rmin, rmax: list
+            lower and upper cutoff in every euclidean direction.
+        scaled: boolean
+            scale the meshes with unitcell size?
+        pbc: boolean
+            assume periodic boundary conditions?
+        indexing: 'xy' or 'ij'
+            indexing scheme used by np.meshgrid.
 
-            Returns
-            -------
-            X, Y, Z: np.arrays; meshgrid
+        Returns
+        -------
+
+        X, Y, Z: tuple of np.ndarray
+            defines mesh.
         """
 
         if rmax == 0:

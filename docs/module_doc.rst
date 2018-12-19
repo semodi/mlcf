@@ -6,6 +6,10 @@ elf
 .. automodule:: mlc_func.elf
     :members:
 
+.. autoclass:: mlc_func.elf.ElF
+    :members:
+
+
 density
 -------
 .. automodule:: mlc_func.elf.density
