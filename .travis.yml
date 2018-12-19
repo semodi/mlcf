@@ -25,6 +25,7 @@ install:
   - conda info -a
   - pip install codecov
   - pip install pytest-cov
+  - pip install pytest
   - conda install tensorflow
   - conda install -c moble spherical_functions
   - conda list
@@ -34,7 +35,7 @@ before_script:
 
 script:
   - pip install -e .
-  - py.test -v 
+  - pytest -v 
   
 after_success:
   - codecov
