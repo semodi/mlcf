@@ -16,12 +16,12 @@ density
     :members:
 
 real_space
--------
+----------
 .. automodule:: mlc_func.elf.real_space
     :members:
 
 geom
------
+----
 .. automodule:: mlc_func.elf.geom
     :members:
 

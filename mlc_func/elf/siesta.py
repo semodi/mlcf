@@ -42,13 +42,14 @@ def get_density(file_path):
     fourth line the grid dimensions
     subsequent lines give density on grid
 
-    Parameters:
+    Parameters
     -----------
-    file_path: string; path to RHO (or RHOXC) file from which density is read
+        file_path: string
+            path to RHO (or RHOXC) file from which density is read
 
-    Returns:
+    Returns
     --------
-    Density
+        Density
     """
     rhopath = file_path
     unitcell = np.zeros([3, 3])

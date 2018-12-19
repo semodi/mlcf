@@ -2,9 +2,9 @@
 class ElF():
     """ Class defining the electronic descriptors used by MLCF. ElF stands for ELectronic Fingerprint
 
-        Parameters:
-        ---
-        
+    Parameters
+    ----------
+
         value: dict or np.ndarray
              value of descriptor can either be a complex (dict) or real (np.ndarray) tensor.
         angles: np.ndarray (3)
@@ -15,6 +15,7 @@ class ElF():
             atomic species (element symbol)
         unitcell: np.ndarray (3,3)
             unitcell of the system (used by fold_back_coords during alingment)
+
     """
     def __init__(self, value, angles, basis, species, unitcell):
 

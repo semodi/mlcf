@@ -42,15 +42,22 @@ def make_real(tensor):
     return np.array(tensor_real)
 
 def make_complex(tensor_array, n_rad, n_l):
-    """
-    Take real tensors provided as a np.ndarray and convert them into
+    """Take real tensors provided as a np.ndarray and convert them into
     complex tensors represented as a dictionary
 
-    Parameters:
-    ---
-    tensor_array: np.ndarray, real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
-    n_rad: int, number of radials
-    n_l: int, maximum angular momentum
+    Parameters
+    -------
+        tensor_array: np.ndarray
+            real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
+        n_rad: int,
+            number of radials
+        n_l: int,
+            maximum angular momentum
+
+    Returns
+    -------
+        dict
+            dictionary containing complex tensor elements (keys: {'n,l,m'})
     """
     tensor = {}
     tensor_complex = {}
@@ -73,10 +80,16 @@ def make_complex(tensor_array, n_rad, n_l):
 
 def get_casimir(tensor):
     """ Get the casimir element (equiv. to L_2 norm) of a complex tensor
-    Parameters:
-    ---
 
-    tensor: dict, dictionary containing tensor in its complex form
+    Parameters
+    ---------
+        tensor: dict
+            dictionary containing tensor in its complex form
+
+    Returns
+    -----
+        dict
+            Casimir element {'n,l'}
     """
     casimir = {}
 
@@ -95,14 +108,15 @@ def get_euler_angles(co):
     """ Given a coordinate system co, return the euler angles
     that relate this CS to the standard CS
 
-    Parameters:
-    -----------------
-    co: np.ndarray (3,3); coordinates of the body-fixed axes in the
-                          global coordinate system
+    Parameters
+    -----------
+        co: np.ndarray (3,3)
+            coordinates of the body-fixed axes in the global coordinate system
 
-    Returns:
+    Returns
     -------
-    alpha, beta, gamma: float; euler angles
+        tuple of floats
+            euler angles
 
     """
     beta = np.arccos(co[2,2])
@@ -123,21 +137,23 @@ def get_euler_angles(co):
 
 def rotate_vector(vec, angles, inverse = False):
     """ Rotate a real vector (euclidean order: xyz) with euler angles
-        inverse = False: rotate vector
-        inverse = True: rotate CS
 
-    Parameters:
-    ---
-    vec: np.ndarray (?, 3), vector(s) to rotate, note that if more than one vector provided,
-        everyone is rotated by the same angles
+    Parameters
+    --------
+        vec: np.ndarray (?, 3)
+            vector(s) to rotate, note that if more than one vector provided,
+            ever vector is rotated by the same angles.
 
-    angles: np.ndarray (3), euler angles: alpha, beta, gamma
+        angles: np.ndarray (3)
+            euler angles: alpha, beta, gamma.
 
-    inverse: bool, {False: rotate vector, True: rotate CS}
+        inverse: bool
+            {False: rotate vector, True: rotate coordinate system}
 
-    Returns:
-    ---
-    np.ndarray, rotated vector(s)
+    Returns
+    -------
+        np.ndarray
+            rotated vector(s)
     """
 
     if vec.ndim == 1 and len(vec) == 3:
@@ -161,22 +177,27 @@ def rotate_vector(vec, angles, inverse = False):
     return vec[:,[2,0,1]].real
 
 def rotate_tensor(tensor, angles, inverse = False):
-    """ Rotate a (complex!) tensor.
+    """ Rotate a complex tensor.
 
-    Parameters:
+    Parameters
     ----------
-    tensor: dict; complex rank-2 tensor to rotate; the tensor is expected to be complete
-        that is no entries should be missing
-    angles: np.ndarray (3), euler angles: alpha, beta, gamma
-    inverse: bool, {False: rotate vector, True: rotate CS}
+        tensor: dict
+            complex rank-2 tensor to rotate; the tensor is expected to be complete
+            i.e. no entries should be missing
+        angles: np.ndarray (3,)
+            euler angles: alpha, beta, gamma
+        inverse: bool,
+             {False: rotate vector, True: rotate CS}
 
-    Returns:
+    Returns
     ---------
-    Rotated version of tensor
+        dict
+            Rotated version of tensor
 
-    Info:
-    -------
-    Remember that in nncs and elfcs alignment, inverse = True should be used
+
+    Info
+    ----
+        Remember that in nncs and elfcs alignment, inverse = True should be used
     """
 
     if not isinstance(tensor['0,0,0'], np.complex128) and not isinstance(tensor['0,0,0'], np.complex64)\
@@ -212,14 +233,22 @@ def rotate_tensor(tensor, angles, inverse = False):
     return tensor_rotated
 
 def get_elfcs_angles(i, coords, tensor):
-    """ Get angles relating global coordinate system to local coordinate system defined
-        by electronic structure
+    """ Get angles relating global coordinate system to
+        local coordinate system (LCS) defined by electronic structure
 
-        Parameters:
-        ---
-        i: int, LCS around atom i
-        coords: np.ndarray (?, 3), all atomic positions in given sytem
-        tensor: dict, complex tensor (electronic descriptor) to use for alignment
+        Parameters
+        -------
+            i: int
+                LCS around atom i
+            coords: np.ndarray (?, 3)
+                all atomic positions in given sytem
+            tensor: dict
+                complex tensor (electronic descriptor) to use for alignment
+
+        Returns
+        -------
+            list of floats
+                Euler angles alpha, beta, gamma
     """
 
     # Collect all p-orbitals as vectors
@@ -275,15 +304,23 @@ def get_elfcs_angles(i, coords, tensor):
     return angles
 
 def get_nncs_angles(i, coords, tensor = None):
+    """ Get angles relating global coordinate system to local
+        coordinate system (LCS) defined by nearest neighbors
 
-    """ Get angles relating global coordinate system to local coordinate system defined
-        by nearest neighbors
-
-        Parameters:
+        Parameters
         ---
-        i: int, LCS around atom i
-        coords: np.ndarray (?, 3), all atomic positions in given sytem
-        tensor: dummy
+            i: int
+                 LCS around atom i
+            coords: np.ndarray (?, 3)
+                 all atomic positions in given sytem
+            tensor: None
+                placeholder
+
+        Returns
+        -------
+            list of floats
+                Euler angles alpha, beta, gamma
+
     """
 
 
@@ -322,16 +359,26 @@ def get_nncs_angles(i, coords, tensor = None):
     return angles
 
 #TODO: Find faster implementation than recursion, non-ortho implementation
+
 def fold_back_coords(i, coords, unitcell):
-    """ Return the periodic images of coords in a unit-cell
-        that are closest to coords[i]
+    """
+    Return the periodic images of coords in a unit-cell
+    that are closest to coords[i]
 
-    Parameters:
-    ---
+    Parameters
+    ------
 
-    i: int, central atom
-    coords: np.ndarray (?, 3), all atomic positions in given sytem
-    unitcell: np.ndarray (3,3), unitcell in angstrom
+        i: int
+             central atom
+        coords: np.ndarray (?, 3)
+            all atomic positions in given sytem
+        unitcell: np.ndarray (3,3)
+            unitcell in angstrom
+
+    Returns
+    -------
+        np.ndarray (?, 3)
+            peridic images of coords
     """
 
     if not np.allclose(unitcell.astype(bool), np.eye(3).astype(bool)):

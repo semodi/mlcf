@@ -1,5 +1,5 @@
-""" Module that implements Network, a class that combines several subnets
-to build a master neural network that can be trained on datasets.
+""" Module that implements Energy_Network, the machine learned correcting functional (MLCF)
+for energies
 """
 
 import numpy as np
@@ -26,6 +26,15 @@ Dataset = namedtuple("Dataset", "data species")
 class Energy_Network():
 
     def __init__(self, subnets):
+        """ Machine learned correcting functional (MLCF) for energies
+
+            Parameters
+            ----------
+
+                subnets: list of Subnetwork
+                    each subnetwork belongs to a single atom inside the system
+                    and computes the atomic contributio to the total energy
+        """
 
         if not isinstance(subnets, list):
             self.subnets = [subnets]
@@ -102,16 +111,20 @@ class Energy_Network():
     def get_feed(self, which = 'train', train_valid_split = 0.8, seed = 42):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train',test'}, which part of the dataset is used
-        train_valid_split: float; ratio of train and validation set size
-        seed: int; seed parameter for the random shuffle algorithm, make
+            which: {'train',test'}
+                which part of the dataset is used
+            train_valid_split: float
+                ratio of train and validation set size
+            seed: int
+                seed parameter for the random shuffle algorithm, make
 
-        Returns:
+        Returns
         --------
-        (dictionary, dictionary): either (training feed dictionary, validation feed dict.)
-                                or (testing feed dictionary, None)
+            (dictionary, dictionary)
+                either (training feed dictionary, validation feed dict.)
+                or (testing feed dictionary, None)
         """
         train_feed_dict = {}
         valid_feed_dict = {}
@@ -139,8 +152,9 @@ class Energy_Network():
 
         Returns
         -------
-        cost_list: [tensorflow.placeholder]; list of costs for subnets. subnets
-            whose outputs are added together share cost functions
+            cost_list: [tensorflow.placeholder]
+                list of costs for subnets. subnets
+                whose outputs are added together share cost functions
         """
         cost_list = []
 
@@ -174,21 +188,27 @@ class Energy_Network():
 
         """ Train the master neural network
 
-        Parameters:
-        ----------
-        step_size: float; step size for gradient descent
-        max_steps: int; number of training epochs
-        b: float; regularization parameter
-        verbose: boolean; print cost for intermediate training epochs
-        optimizer: {tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...}
-        adaptive_rate: boolean; wether to adjust step_size if cost increases
-                        not recommended for AdamOptimizer
-        multiplier: list of float, multiplier that allow to give datasets more
-            weight than others
+            Parameters
+            ----------
+                step_size: float
+                    step size for gradient descent
+                max_steps: int
+                    number of training epochs
+                b: float
+                    regularization parameter
+                verbose: boolean
+                    print cost for intermediate training epochs
+                optimizer: tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...
+                adaptive_rate: boolean
+                    wether to adjust step_size if cost increases
+                                not recommended for AdamOptimizer
+                multiplier: list of float
+                    multiplier that allow to give datasets more
+                    weight than others
 
-        Returns:
-        --------
-        None
+            Returns
+            --------
+            None
         """
 
 
@@ -320,17 +340,22 @@ class Energy_Network():
     def predict(self, features, species, use_masks = False, return_gradient = False):
         """ Get predicted energies
 
-        Parameters:
+        Parameters
         ----------
-        features: np.ndarray, input features
-        species: str, predict atomic contribution to energy for this species
-        use_masks: bool, whether masks should be applied to the provided features
-        return_gradient: instead of returning energies, return gradient of network
+        features: np.ndarray
+            input features
+        species: str
+            predict atomic contribution to energy for this species
+        use_masks: bool
+             whether masks should be applied to the provided features
+        return_gradient: bool
+            instead of returning energies, return gradient of network
             w.r.t. input features
 
-        Returns:
+        Returns
         -------
-        np.ndarray, predicted energies or gradient
+        np.ndarray
+            predicted energies or gradient
 
         """
         species = species.lower()
@@ -396,16 +421,18 @@ class Energy_Network():
 
                 return energies
 
-    def get_logits(self, summarize = True, which = 'train'):
+    def get_energies(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train','test'}; which set logits are computed for
+        which: str
+            {'train','test'} which set logits are computed for
 
-        Returns:
+        Returns
         --------
-        [numpy.array]; resulting logits grouped by independent subnet datasets
+         list of numpy.ndarray
+            resulting energies grouped by independent subnet datasets
         """
 
         if not self.model_loaded:
@@ -435,7 +462,7 @@ class Energy_Network():
                 return return_list
 
     def save_model(self, path):
-        """ Save trained m = tf.train.AdamOptimizer(learning_rate = step_size)
+        """ Save trained model to path
         """
 
         if path[-5:] == '.ckpt':
@@ -468,7 +495,8 @@ class Energy_Network():
 
     def save_all(self, net_dir, override = False):
         """ Saves the model including all subnets and datasets
-        using pickle
+        using pickle to directory net_dir, if directory exists only
+        save if override = True
         """
         try:
             os.mkdir(net_dir)
@@ -495,7 +523,7 @@ class Energy_Network():
 
 
     def load_all(self, net_dir):
-        """ Loads the model including all subnets and datasets
+        """ Loads the model in net_dir including all subnets and datasets
         using pickle
         """
 
@@ -546,15 +574,19 @@ class Subnet():
     def get_feed(self, which, train_valid_split = 0.8, seed = None):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train', 'valid', 'test'}, which part of the dataset is used
-        train_valid_split: float; ratio of train and validation set size
-        seed: int; seed parameter for the random shuffle algorithm, make
+            which: str,
+                {'train', 'valid', 'test'}
+                which part of the dataset is used
+            train_valid_split: float
+                ratio of train and validation set size
+            seed: int
+                seed parameter for the random shuffle algorithm
 
-        Returns:
+        Returns
         --------
-        dictionary
+            dict
         """
         if seed == None:
             seed = Subnet.seed
@@ -591,13 +623,14 @@ class Subnet():
     def get_logits(self, i):
         """ Builds the subnetwork by defining logits and placeholders
 
-        Parameters:
+        Parameters
         -----------
-        i: int; index to label datasets
+            i: int
+                index to label datasets
 
-        Returns:
+        Returns
         ---------
-        logits, x, y: tensorflow tensors
+            tensorflow tensors
         """
 
         with tf.variable_scope(self.name) as scope:
@@ -630,17 +663,17 @@ class Subnet():
         test_size = 0.2, target_filter = None, scale = True):
         """ Adds dataset to the subnetwork.
 
-        Parameters:
-        -----------
-        dataset: dataset (a named tuple (data, species, n_copies)); contains
-            datasets that will be associated with subnetwork for training and
-            evaluation
-        targets: (?,1) or (?) numpy array; target values for training and
-            evaluation
+            Parameters
+            -----------
+                dataset: dataset
+                    contains datasets that will be associated with subnetwork for training and
+                    evaluation
+                targets: np.ndarray
+                    target values for training and evaluation
 
-        Returns:
-        --------
-        None
+            Returns
+            --------
+                None
         """
 
         if self.species != None:
@@ -699,13 +732,14 @@ class Subnet():
 def load_energy_model(path):
     """ Load energy MLCF
 
-    Parameters:
-    ---------
-    path: str, directory in which MLCF is stored
+        Parameters
+        ---------
+            path: str
+                directory in which energy MLCF is stored
 
-    Returns:
-    -------
-    Network (energy MLCF)
+        Returns
+        -------
+            Energy_Network
     """
     network = Energy_Network([])
     network.load_all(path)
@@ -714,27 +748,40 @@ def load_energy_model(path):
 def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
     filters = [], autofilt_percent = 0, test_size = 0.2):
 
-    ''' Return a trainable energy MLCF (neural network)
+    """ Return a trainable energy MLCF (neural network)
 
-    Parameters:
+    Parameters
     ----------
 
-    feature_src: list; list of paths to the hdf5 containing the features
-    target_src: list; list of paths to the csv files containing the target energies
-                entries in target_scr and feature_src correspond to each other
-    masks: dict containing list booleans; can be used to select which features to use.
-        keys specify the atomic species.
-        default: use all features
-    automask_std: float, if mask not set exclude all features whose stdev across dataset
-        is smaller than this value
+        feature_src: list
+            list of paths to the hdf5 containing the features
+        target_src: list
+            list of paths to the csv files containing the target energies
+            entries in target_scr and feature_src correspond to each other
+        masks: dict,
+            containing list booleans; can be used to select which features to use.
+            keys specify the atomic species.
+            default: use all features
 
-    filters: list containing list of booleans; can be used to exclude datapoints
-        in sets (e.g. outliers)
+        automask_std: float,
+            if mask not set exclude all features whose stdev across dataset
+            is smaller than this value
 
-    autofilt_percent: float, exclude this percentile of extreme datapoints from set
+        filters: list,
+            containing list of booleans; can be used to exclude datapoints
+            in sets (e.g. outliers)
+
+        autofilt_percent: float,
+            exclude this percentile of extreme datapoints from set
             (only if filters not set)
-    test_size: float, relative size of hold_out (test) set
-    '''
+        test_size: float,
+            relative size of hold_out (test) set
+    Returns
+    -------
+
+        Energy_Network
+
+    """
 
     if not len(feature_src) == len(target_src):
         raise Exception('Please provided only one target location for each feature set')
@@ -785,14 +832,17 @@ def get_energy_filters(target_src, autofilt_percent = 0):
     """ For a given energy target dataset return filter that cutoff the
     upper and lower percentile specified in autofilt_percent
 
-    Parameters:
+    Parameters
     ----------
-    target_src, str, path of csv file containing energy targets
-    autofilt_percent, float, percentile to cut off
+    target_src: str
+        path of csv file containing energy targets
+    autofilt_percent: float
+        percentile to cut off
 
-    Returns:
+    Returns
     --------
-    list of bool, filters
+        list of bool
+            filters
     """
     filters = []
     for tsrc in target_src:

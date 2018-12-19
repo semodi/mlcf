@@ -9,7 +9,8 @@ import mlc_func.elf as elf
 import json
 
 class FeatureGetter():
-
+    """ Base-class for any feature getter
+    """
     def __init__(self, client = None):
 
         class DummyView():
@@ -38,16 +39,19 @@ class FeatureGetter():
             self.n_clients = 1
 
 class DescriptorGetter(FeatureGetter):
-    """ Reads the real space electron density and returns electronic descriptors
-    """
 
     def __init__(self, basis, client = None, rhopath='./H2O.RHOXC'):
-        """
-        Parameters:
+        """ Reads the real space electron density and returns electronic descriptors
+
+        Parameters
         ---
-        basis: dict, dictionary defining the basis
-        client: ipyparallel client for parallel processing
-        rhopath: path under which the electron density can be found after every MD step
+
+            basis: dict
+                dictionary defining the basis
+            client: ipyparallel.client
+                for parallel processing
+            rhopath: str
+                path under which the electron density can be found after every MD step
         """
         super().__init__(client = client)
         self.rhopath = rhopath
@@ -58,7 +62,10 @@ class DescriptorGetter(FeatureGetter):
 
     def set_scalers(self, scalers):
         """
-        scalers: dictionary, dictionary containing the scalers that are used to transform
+        Parameters
+        -----------
+        scalers: dictionary
+            dictionary containing the scalers that are used to transform
             the electronic descriptors before feeding them to the neural network,
             dict keys correspond to element symbols
         """
@@ -66,14 +73,24 @@ class DescriptorGetter(FeatureGetter):
 
     def set_masks(self, masks):
         """
-        scalers: dictionary, dictionary containing the masks that are applied to
-            the electronic descriptors before feeding them to the neural network,
+        Parameters
+        ----------
+        masks: dictionary
+            dictionary containing the masks that are applied to
+            the electronic descriptors before feeding them into the neural network,
             dict keys correspond to element symbols
         """
         self.masks = masks
 
     def get_features(self, atoms):
+        """ Return the electronic descriptos for a set of atoms, electron density
+        is read from file specified in self.rhopath
 
+        Parameters
+        -----------
+            atoms, ase.Atoms
+            
+        """
         # if not mask is set use all features
         for s in self.scalers:
             if s not in self.masks:

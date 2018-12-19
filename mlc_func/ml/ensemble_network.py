@@ -3,14 +3,15 @@ import numpy as np
 import copy
 
 class Ensemble_Network():
-    """ Ensemble Network to obtain confidence intervals for predictions
-    """
     def __init__(self, network, n = 3):
-        """
-        Parameters:
-        -----------
-        network: Network, root network from which to create ensemble
-        n: int, ensemble size
+        """Ensemble Network to obtain confidence intervals for predictions
+
+            Parameters
+            -----------
+                network: Network
+                    root network from which to create ensemble
+                n: int
+                    ensemble size
         """
 
         self.models = []
@@ -34,16 +35,17 @@ class Ensemble_Network():
     def train(self, idx):
         """ Train model specified by idx
 
-        Parameters:
-        --------
-        idx: int, ensemble index
+            Parameters
+            --------
+                idx: int
+                ensemble index
         """
         self.trained[idx] = True
         self.models[idx].train(step_size = self.models[idx].learning_rate,
                                 b = self.models[idx].b, restart = True)
 
     def train_next(self):
-        """ Train the next untrained model unit all models are trained
+        """ Train the next untrained model
         """
 
         cycle_cnt = 0
@@ -65,14 +67,17 @@ class Ensemble_Network():
     def predict(self, feat, processed = False):
         """ Get mean prediction across ensemble
 
-        Parameters:
+        Parameters
         ----------
-        feat: np.ndarray, input features
-        processed: bool, are features processed (scaled, masked)?
+            feat: np.ndarray
+                input features
+            processed: bool
+                are features processed (scaled, masked)?
 
-        Returns:
+        Returns
         -------
-        np.ndarray, mean prediction
+            np.ndarray
+                mean prediction
         """
 
         if not np.alltrue(self.trained):
@@ -87,13 +92,15 @@ class Ensemble_Network():
         """ Get mean prediction across ensemble but instead of providing features,
         give source path where features are found
 
-        Parameters:
+        Parameters
         ----------
-        path:  path to .hdf5 file containing features
+            path:  str
+                path to .hdf5 file containing features
 
-        Returns:
+        Returns
         -------
-        np.ndarray, mean prediction
+            np.ndarray
+                mean prediction
 
         """
 
@@ -108,10 +115,12 @@ class Ensemble_Network():
     def save(self, net_dir, override = False):
         """ Save ensemble Network
 
-        Parameters:
+        Parameters
         ----------
-        net_dir: str, directory where to save network
-        override: bool, if network already exists allow to override? default = False
+            net_dir: str
+                directory where to save network
+            override: bool
+                if network already exists allow to override? default = False
         """
         if net_dir[-1] == '/': net_dir = net_dir[:-1]
         for i, model in enumerate(self.models):
@@ -120,14 +129,17 @@ class Ensemble_Network():
     def std_predict(self, feat, processed = False):
         """ Get standard deviation of predictions across ensemble
 
-        Parameters:
+        Parameters
         ----------
-        feat: np.ndarray, input features
-        processed: bool, are features processed (scaled, masked)?
+            feat: np.ndarray
+                input features
+            processed: bool
+                are features processed (scaled, masked)?
 
-        Returns:
+        Returns
         -------
-        np.ndarray, std of predictions
+            np.ndarray
+                std of predictions
         """
 
         if not np.alltrue(self.trained):
@@ -143,15 +155,18 @@ class Ensemble_Network():
 def load_ensemble_network(net_dir, n, species):
     """Loads an ensemble Network
 
-    Parameters:
+    Parameters
     ----------
-    net_dir: str, directory in which network is stored
-    n: int, number of networks per ensemble
-    species: str, which chem. element to load for
+        net_dir: str
+            directory in which network is stored
+        n: int
+            number of networks per ensemble
+        species: str
+            which chem. element to load for
 
     Returns:
     -------
-    Ensemble_Network
+        Ensemble_Network
     """
 
     if net_dir[-1] == '/': net_dir = net_dir[:-1]

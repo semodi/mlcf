@@ -1,3 +1,7 @@
+""" Module that implements Force_Network, the machine learned correcting functional (MLCF)
+for forces
+"""
+
 import mlc_func.elf as elf
 import numpy as np
 import pandas as pd
@@ -15,21 +19,28 @@ import json
 from ase.io import read
 
 class Force_Network():
-    """ MLCF for force perdiction"""
     def __init__(self, species, scaler, basis, datasets = {}, mask = [], n_layers = 3, nodes_per_layer = 8,
                 b = 0):
-        """
+        """ MLCF for force perdiction
+
         Parameters
         ----------
 
-        species: str, chemical element symbol
-        scaler: sklearn Scaler
-        basis: dict, basis that was used to create electronic descriptors
-        datasets: dict, datasets provided as {'X_train': np.ndarray, 'X_test': etc...}
-        mask: list of bool, used to mask the features and filter out features with low variance
-        n_layers: int, number of hidden layers, default = 3
-        nodes_per_layer: int, nodes for each hidden layer, default = 8
-        b: float, l2-regularization strenght, default = 0
+            species: str
+                chemical element symbol
+            scaler: sklearn Scaler
+            basis: dict
+                basis that was used to create electronic descriptors
+            datasets: dict
+                datasets provided as {'X_train': np.ndarray, 'X_test': etc...}
+            mask: list of bool
+                used to mask the features and filter out features with low variance
+            n_layers: int
+                number of hidden layers, default = 3
+            nodes_per_layer: int
+                nodes for each hidden layer, default = 8
+            b: float
+                l2-regularization strenght, default = 0
         """
 
         self.species = species
@@ -98,18 +109,31 @@ class Force_Network():
               tol_valid = 0):
         """ Train the model
 
-        Parameters:
+        Parameters
         -----------
-        step_size: float, step size to take during gradient descent, default=0.001
-        max_epochs: int, max. number of epochs to train, default=50001
-        b: float, l2-regularization
-        early_stopping: bool, use early stopping (interrupt training once valid loss increases),
-            default=False
-        batch_size: int, number of samples per batch, default=500
-        epochs_per_output: int, only print overview every epochs_per_output steps, default=500
-        restart: bool, restart training from beginning (reset network), default=False
-        tol_train: float, stop training if relative value of training loss decreases by less than this value
-        tol_valid: float, stop training if relative value of validation loss decreases by less than this value
+            step_size: float
+                step size to take during gradient descent, default=0.001
+            max_epochs: int
+                max. number of epochs to train, default=50001
+            b: float
+                l2-regularization
+            early_stopping: bool
+                use early stopping (interrupt training once valid loss increases),
+                default=False
+            batch_size: int
+                number of samples per batch, default=500
+            epochs_per_output: int
+                only print overview every epochs_per_output steps, default=500
+            restart: bool
+                restart training from beginning (reset network), default=False
+            tol_train: float
+                stop training if relative value of training loss decreases by less than this value
+            tol_valid: float
+                stop training if relative value of validation loss decreases by less than this value
+        Returns
+        ----
+
+            None
         """
 
         if not self.compiled or restart:
@@ -147,14 +171,17 @@ class Force_Network():
     def predict(self, feat, processed = False):
         """ Get predicted forces
 
-        Parameters:
+        Parameters
         ----------
-        feat: np.ndarray, input features
-        processed: bool, are features processed (scaled, masked)?
+            feat: np.ndarray
+                input features
+            processed: bool
+                are features processed (scaled, masked)?
 
-        Returns:
+        Returns
         -------
-        np.ndarray, predicted forces
+            np.ndarray
+                predicted forces
         """
         if not processed:
             return self.model.predict(self.scaler.transform(feat[:,self.mask]))
@@ -164,14 +191,17 @@ class Force_Network():
     def evaluate(self, plot = False, on = 'test'):
         """ Evaluate model performance
 
-        Parameters:
-        -----------
-        plot: bool, plot correlation plots
-        on: {'test','train','valid'} which set to evaluat on
-
-        Returns:
+        Parameters
         --------
-        dict, containing rmse, mae and max. abs. error
+            plot: bool
+                plot correlation plots
+            on: str
+                {'test','train','valid'} which set to evaluat on
+
+        Returns
+        --------
+            dict
+                containing rmse, mae and max. abs. error
         """
         X, y = {'train':[self.X_train, self.y_train],
                 'valid':[self.X_valid, self.y_valid],
@@ -202,11 +232,18 @@ class Force_Network():
     def save_all(self, net_dir, override = False):
         """ Save force MLCF
 
-        Parameters:
+        Parameters
         -----------
-        net_dir: str, directory to save mlcf to
-        override: bool, if net_dir already contains model, allow to override?
-            default = False
+            net_dir: str
+                directory to save mlcf to
+            override: bool
+                if net_dir already contains model, allow to override?
+                default = False
+
+        Returns
+        -------
+
+            None
         """
         if net_dir[-1] != '/': net_dir += '/'
         to_save = {'mask': self.mask, 'scaler': self.scaler,
@@ -224,9 +261,10 @@ class Force_Network():
     def load_all(self, net_dir):
         """ Load force MLCF from net_dir
 
-        Parameters:
+        Parameters
         ----------
-        net_dir: str, path to directory containing MLCF
+            net_dir: str
+                path to directory containing MLCF
         """
         supp = pickle.load(open(net_dir + 'supp_' + self.species, 'rb'))
         self.model = keras.models.load_model(net_dir + 'force_' + self.species)
@@ -238,14 +276,17 @@ class Force_Network():
     def learning_curve(self, steps = 5):
         """Create a learning curve by varying the training set size
 
-        Parameters:
+        Parameters
         -----------
-        steps: int, how many different training set sizes to use
+            steps: int
+                how many different training set sizes to use
 
-        Returns:
+        Returns
         ---------
 
-        dict = {'N': training set size,'train': training loss,'valid': validation loss}
+            dict,
+                {'N': training set size,'train': training loss,
+                'valid': validation loss}
         """
         tot_len = len(self.X_train)
         save_X, save_y = np.array(self.X_train), np.array(self.y_train)
@@ -273,13 +314,15 @@ class Force_Network():
         """ Get force prediction but instead of providing features,
         give source path where features are found
 
-        Parameters:
+        Parameters
         ----------
-        path:  path to .hdf5 file containing features
+            path: str
+                path to .hdf5 file containing features
 
         Returns:
         -------
-        np.ndarray, force prediction
+            np.ndarray
+                 force prediction
 
         """
         elfs, angles = elf.utils.hdf5_to_elfs_fast(path)
@@ -298,10 +341,13 @@ class Force_Network():
 def load_force_model(net_dir, species):
     """ Load force MLCF from net_dir for a given element
 
-    Parameters:
+    Parameters
     ----------
-    net_dir: str, path to directory containing MLCF
-    species: str, specifies which chemical element to load model for
+
+        net_dir: str
+            path to directory containing MLCF
+        species: str
+            specifies which chemical element to load model for
     """
 
     model = Force_Network(species, None, None, mask = [True])
@@ -313,25 +359,40 @@ def build_force_mlcf(feature_src, target_src, traj_src, species, mask = [], filt
     random_state = 42):
     ''' Return a trainable force MLCF (neural network)
 
-    Parameters:
+    Parameters
     ----------
 
-    feature_src: list; list of paths to the hdf5 containing the features
-    target_src: list; list of paths to the csv files containing the target forces
-                entries in target_scr and feature_src correspond to each other
-    traj_src: list; list of paths to the .traj/.xyz files (needed to determine species
-                of each atom)
-    species: string; containing the species that model should be fitted for
-    mask: list containing booleans; can be used to select which features to use.
-        default: use all features
-    filters: list containing list of booleans; can be used to exclude datapoints
-        in sets (e.g. outliers)
-    automask_std: float, if mask not set exclude all features whose stdev across dataset
-        is smaller than this value
-    autofilt_percent: float, exclude this percentile of extreme datapoints from set
+        feature_src: list
+            list of paths to the hdf5 containing the features
+        target_src: list
+            list of paths to the csv files containing the target forces
+            entries in target_scr and feature_src correspond to each other
+        traj_src: list
+            list of paths to the .traj/.xyz files (needed to determine species
+            of each atom)
+        species: string
+            containing the species that model should be fitted for
+        mask: list
+            containing booleans; can be used to select which features to use.
+            default: use all features
+        filters: list
+            containing list of booleans; can be used to exclude datapoints
+            in sets (e.g. outliers)
+        automask_std: float
+            if mask not set exclude all features whose stdev across dataset
+            is smaller than this value
+        autofilt_percent: float
+            exclude this percentile of extreme datapoints from set
             (only if filters not set)
-    test_size: float, relative size of hold_out (test) set
-    random_state: int, state used to perform shuffle before spliting dataset
+        test_size: float
+            relative size of hold_out (test) set
+        random_state: int
+            state used to perform shuffle before spliting dataset
+
+    Returns
+    -------
+
+    Force_Network
     '''
 
     species = species.lower()

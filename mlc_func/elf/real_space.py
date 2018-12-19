@@ -55,17 +55,22 @@ def box_around(pos, radius, density):
     given radius. Dictionary contains box in mesh, euclidean and spherical
     coordinates
 
-    Parameters:
+    Parameters
     ---
 
-    pos: np.ndarray (3) or (1,3), coordinates for box center
-    radius: float, box radius
-    density: Density, only needed for Density.unitcell and Density.grid
+        pos: np.ndarray (3,) or (1,3),
+            coordinates for box center
+        radius: float
+            box radius
+        density: Density
+            only needed for Density.unitcell and Density.grid
 
-    Returns:
+    Returns
     ---
 
-    dict, box in mesh, euclidean and spherical coordinates
+        dict
+            {'mesh','real','radial'}, box in mesh,
+            euclidean and spherical coordinates
     '''
 
     if pos.shape != (1,3) and (pos.ndim != 1 or len(pos) !=3):
@@ -106,7 +111,28 @@ def box_around(pos, radius, density):
 def g(r, r_i, r_c, a, gamma):
     """
     Non-orthogonalized radial functions
+
+    Parameters
+    -------
+
+        r: float
+            radius
+        r_i: float
+            inner radial cutoff
+        r_o: float
+            outer radial cutoff
+        a: int
+            exponent (equiv. to radial index n)
+        gamma: float
+            damping parameter
+
+    Returns
+    ------
+
+        float
+            value of radial function at radius r
     """
+
     def g_(r, r_i, r_c, a):
         return (r-r_i)**(2)*(r_c-r)**(a+2)*np.exp(-gamma*(r/r_c)**(1/4))
 #          return (r-r_i)**(5)*(r_c-r)**(a+2)
@@ -117,6 +143,24 @@ def g(r, r_i, r_c, a, gamma):
 def S(r_i, r_o, nmax, gamma):
     '''
     Overlap matrix between radial basis functions
+
+    Parameters
+    -------
+
+        r_i: float
+            inner radial cutoff
+        r_o: float
+            outer radial cutoff
+        nmax: int
+            max. number of radial functions
+        gamma: float
+            damping parameter
+
+    Returns
+    -------
+
+        np.ndarray (nmax, nmax)
+            Overlap matrix
     '''
 
     S_matrix = np.zeros([nmax,nmax])
@@ -133,7 +177,28 @@ def S(r_i, r_o, nmax, gamma):
 def radials(r, r_i, r_o, W, gamma):
     '''
     Get orthonormal radial basis functions
+
+    Parameters
+    -------
+
+        r: float
+            radius
+        r_i: float
+            inner radial cutoff
+        r_o: float
+            outer radial cutoff
+        W: np.ndarray
+            orthogonalization matrix
+        gamma: float
+            damping parameter
+
+    Returns
+    -------
+
+        np.ndarray
+            radial functions
     '''
+
     result = np.zeros([len(W)] + list(r.shape))
     for k in range(0,len(W)):
         rad = g(r,r_i,r_o,k+1, gamma)
@@ -147,25 +212,54 @@ def radials(r, r_i, r_o, W, gamma):
 def get_W(r_i, r_o, n, gamma):
     '''
     Get matrix to orthonormalize radial basis functions
+
+    Parameters
+    -------
+
+        r_i: float
+            inner radial cutoff
+        r_o: float
+            outer radial cutoff
+        n: int
+            max. number of radial functions
+        gamma: float
+            damping parameter
+
+    Returns
+    -------
+        np.ndarray
+            W, orthogonalization matrix
     '''
     return scipy.linalg.sqrtm(np.linalg.pinv(S(r_i,r_o, n, gamma)))
 
 def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
     '''
-    Parameters:
-    ----------
-    rho: np.ndarray; electron charge density on grid
-    box: dict; contains the mesh in spherical and euclidean coordinates
-    n_rad: int; number of radial functions
-    n_l: int; number of spherical harmonics
-    r_i: float; inner radial cutoff in Angstrom
-    r_o: float; outer radial cutoff in Angstrom
-    gamma: float; exponential damping
-    V_cell: float; volume of one grid cell
+    Project the real space density rho onto a set of basis functions
 
-    Returns:
+    Parameters
+    ----------
+        rho: np.ndarray
+            electron charge density on grid
+        box: dict
+             contains the mesh in spherical and euclidean coordinates,
+             can be obtained with get_box_around()
+        n_rad: int
+             number of radial functions
+        n_l: int
+             number of spherical harmonics
+        r_i: float
+             inner radial cutoff in Angstrom
+        r_o: float
+             outer radial cutoff in Angstrom
+        gamma: float
+             exponential damping
+        V_cell: float
+             volume of one grid cell
+
+    Returns
     --------
-    dict; dictionary containing the complex ELF
+        dict
+            dictionary containing the complex ELF
     '''
 
     R, Theta, Phi = box['radial']
@@ -204,22 +298,25 @@ def decompose(rho, box, n_rad, n_l, r_i, r_o, gamma, V_cell = 1):
     return coeff
 
 def atomic_elf(pos, density, basis, chem_symbol):
-    '''
-    Given an input density and an atomic position decompose the
+    """Given an input density and an atomic position decompose the
     surrounding charge density into an ELF
 
-    Parameter:
+    Parameters
     ----------
-    pos: (,3) np.ndarray; atomic position
-    density: density object; stores charge density rho, unitcell, and grid
-                (see density.py)
-    basis: dict; specifies the basis set used for the ELF decomposition
-                        for each chem. element
-    chem_symbol: str; chemical symbol
+        pos: (,3) np.ndarray
+            atomic position
+        density: Density
+            stores charge density rho, unitcell, and grid (see density.py)
+        basis: dict
+            specifies the basis set used for the ELF decomposition for each chem. element
+        chem_symbol: str
+            chemical element symbol
 
-    Returns:
+    Returns
     --------
-    dict; dictionary containing the real ELF '''
+        dict
+            dictionary containing the real ELF
+    """
 
     chem_symbol = chem_symbol.lower()
 
@@ -273,21 +370,25 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     Given an input density and an ASE Atoms object decompose the
     complete charge density into atomic ELFs
 
-    Parameter:
+    Parameters
     ----------
-    atoms: ASE atoms instance
-    density: density instance; stores charge density rho, unitcell, and grid
-                (see density.py)
-    basis: dict; specifies the basis set used for the ELF decomposition
-                        for each chem. element
+        atoms: ase.Atoms
+        density: Density
+            stores charge density rho, unitcell, and grid (see density.py)
+        basis: dict
+            specifies the basis set used for the ELF decomposition for each chem. element
 
-    view: ipyparallel balanced view for parallel execution through sync map
-    orient_mode = {'none': do not orient and return complex tensor,
-                   'elf'/'nn': orient using the elf or nn algorithm and return
-                   real tensor}
-    Returns:
+        view: ipyparallel.balanced_view
+            for parallel execution through sync map
+
+        orient_mode: str
+            {'none': do not orient and return complex tensor,
+           'elf'/'nn': orient using the elf or nn algorithm and return
+           real tensor}
+    Returns
     --------
-    list; list containing the complex/real atomic ELFs '''
+        list
+            list containing the complex/real atomic ELFs '''
 
     def distribute_workload(array, n_workers):
         job_list = []
@@ -348,9 +449,7 @@ def get_elfs(atoms, density, basis, view = serial_view(), orient_mode = 'none'):
     return elfs_flat
 
 def get_elfs_oriented(atoms, density, basis, mode, view = serial_view()):
-    """
-    Outdated, use get_elfs() with "mode='elf'/'nn'" instead.
-
+    """Outdated, use get_elfs() with "mode='elf'/'nn'" instead.
     Like get_elfs, but returns real, oriented elfs
     mode = {'elf': Use the ElF algorithm to orient fingerprint,
             'nn': Use nearest neighbor algorithm}
@@ -362,21 +461,25 @@ def orient_elf(i, elf, all_pos, mode):
     Takes an ElF and orient it according
     to the rule specified in mode.
 
-    Parameters:
+    Parameters
     -----------
-    i: int; Index of the atom in all_pos
-    elf: ElF; ElF to orient
-    all_pos: numpy.ndarray; positions of all atoms in system (including the
-    one with index i)
-    mode = {'elf': Use the ElF algorithm to orient fingerprint,
-                'nn': Use nearest neighbor algorithm},
-                'water': molecular alignment (can only be used for neat water),
-                'neutral': keep alignment unchanged
+        i: int
+            Index of the atom in all_pos
+        elf: ElF
+            ElF to orient
+        all_pos: numpy.ndarray
+            positions of all atoms in system (including the
+            one with index i)
+        mode: str,
+                    {'elf': Use the ElF algorithm to orient fingerprint,
+                    'nn': Use nearest neighbor algorithm},
+                    'water': molecular alignment (can only be used for neat water),
+                    'neutral': keep alignment unchanged
 
-    Returns:
+    Returns
     --------
-
-    ElF, oriented version of elf
+        ElF
+            oriented version of elf
     """
     oriented_elfs = []
     if mode == 'elf':

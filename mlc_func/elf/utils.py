@@ -18,14 +18,17 @@ def get_view(profile = 'default', n = -1):
     """
     Load ipyparallel balanced_view
 
-    Parameters:
+    Parameters
     ---
-    profile: str, ipyparallel profile, default='default'
-    n: int, use n workers, default=-1 (use all workers)
+        profile: str
+            ipyparallel profile, default='default'
+        n: int
+            use n workers, default=-1 (use all workers)
 
-    Returns:
+    Returns
     ----
-    ipyparallel.balanced_view
+        ipyparallel.balanced_view
+
     """
     client = ipp.Client(profile = profile)
     # view = client.load_balanced_view()
@@ -70,26 +73,34 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     """ Given a root directory, walk directory tree and find all files ending in dens_ext and transform
     electron density into descriptors.
 
-    Parameters:
+    Parameters
     ----------
 
-    root: str, root directory containing all data
-    basis: basis to use to create descriptors
-    dens_ext: str, extension for electron density files
-    add_ext: str, extension for other file containing structural information (atomic positions)
-    method: str, {'elf','nn','water','neutral'}, pick alignment method
-    view: ipyparallel.balanced_view, for parallel processing
-    n_atoms: int, only process the first n_atoms atoms in each system, default: -1 (all atoms)
+        root: str
+            root directory containing all data
+        basis: dict
+            basis to use to create descriptors
+        dens_ext: str
+            extension for electron density files
+        add_ext: str
+            extension for other file containing structural information (atomic positions)
+        method: str
+            {'elf','nn','water','neutral'}, pick alignment method
+        view: ipyparallel.balanced_view
+            for parallel processing
+        n_atoms: int
+            only process the first n_atoms atoms in each system,
+            default: -1 (all atoms)
 
-    Returns:
+    Returns
     --------
+        list of ElF
+            containing the created descriptors
 
-    list of ElF, containing the created descriptors
-
-    Other:
+    Other
     -------
-    Saves energies, forces in a csv file, the structural information in an ase .traj file,
-    the descriptors in a .hdf5 file
+        Saves energies, forces in a csv file, the structural information in an ase .traj file,
+        the descriptors in a .hdf5 file
     """
 
     if root[-1] == '/': root = root[:-1]
@@ -146,15 +157,17 @@ def elfs_to_hdf5(elfs, path):
     """
     Given a list of electronic desriptors (ElFs) save them in an .hdf5 file
 
-    Parameters:
+    Parameters
     ----------
 
-    elfs: list of ElFs, to save
-    path: str, file destination
+        elfs: list of ElFs
+            to save
+        path: str
+            file destination
 
-    Returns:
+    Returns
     --------
-    None
+        None
     """
 
     # TODO: Option to check for consistency across systems
@@ -200,23 +213,27 @@ def elfs_to_hdf5(elfs, path):
 
 def hdf5_to_elfs(path, species_filter = '', grouped = False,
         values_only = False, angles_only = False):
-
     """ Loads .hdf5 file that stores electronic descriptors (ElFs) and returns them
 
-    Parameters:
+    Parameters
     -----------
 
-    path: str, file origin
-    species_filter: str, only load elements specified in this string
-    grouped: boolean, return a dictionary that groups values by element
-    values_only: only return the descriptor values (tensor)
-    angles_only: only return the descriptor angles
+        path: str
+        file origin
+        species_filter: str
+            only load elements specified in this string
+        grouped: boolean
+            return a dictionary that groups values by element
+        values_only: boolean
+            only return the descriptor values (tensor)
+        angles_only: boolean
+            only return the descriptor angles
 
     Returns:
     --------
 
-    Either list of ElFs, or dictionary (if grouped = True), or
-    np.ndarray (if either values_only or angles_only = True)
+        list of ElFs / dict (if grouped = True) / np.ndarray (if either values_only or angles_only = True)
+            ElFs from hdf5 file
     """
 
     file = h5py.File(path, 'r')
@@ -278,16 +295,19 @@ def hdf5_to_elfs_fast(path, species_filter = ''):
     """ Loads .hdf5 file that stores electronic descriptors (ElFs) and returns themself.
     Faster implementation of hdf5_to_elfs. Only works for homogeneous datasets.
 
-    Parameters:
+    Parameters
     -----------
 
-    path: str, file origin
-    species_filter: str, only load elements specified in this string
+        path: str
+            file origin
+        species_filter: str
+            only load elements specified in this string
 
-    Returns:
+    Returns
     --------
 
-    (dict, dict), containing values and angles for each element respectively
+        (dict, dict)
+            containing values and angles for each element respectively
 
     """
 
@@ -324,15 +344,21 @@ def change_alignment(path, traj_path, new_method, save_as = None):
 
     Parameters
     ----------
-    path: str, file origin
-    traj_path: str, path to .traj or .xyz containing the atomic positions
-    new_method: str, {'elf','nn','water','neutral'}, method defining the local coordinate system
-    save_as: destination file to save ElFs, default=None (don't save)
+        path: str
+            file origin
+        traj_path: str
+            path to .traj or .xyz containing the atomic positions
+        new_method: str
+            {'elf','nn','water','neutral'}, method defining the local coordinate system
+        save_as: str
+            destination file to save ElFs, default=None (don't save)
 
-    Returns:
+    Returns
     ---------
-    if save_as == None returns list of electronic descriptors (ElFs)
-    otherwise returns None
+        list of ElF
+            if save_as == None returns list of electronic descriptors (ElFs)
+            otherwise returns None
+
     """
 
     elfs = hdf5_to_elfs(path)
