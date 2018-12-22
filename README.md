@@ -1,5 +1,8 @@
 [![Documentation Status](https://readthedocs.org/projects/mlcf-master/badge/?version=latest)](https://mlcf-master.readthedocs.io/en/latest/?badge=latest)
 [![Build Status](https://travis-ci.org/semodi/mlcf.svg?branch=master)](https://travis-ci.org/semodi/mlcf)
+
+![model](https://github.com/semodi/mlcf/modle.png)
+
 # Machine learned correcting functionals (MLCF)
 
 This repository provides an implementation of the MLCF method introduced in https://arxiv.org/abs/1812.06572. 
