@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/semodi/mlcf.svg?branch=master)](https://travis-ci.org/semodi/mlcf)
 [![Documentation Status](https://readthedocs.org/projects/mlcf/badge/?version=latest)](https://mlcf.readthedocs.io/en/latest/?badge=latest)
+
 <img src="https://github.com/semodi/mlcf/blob/master/model.png" width="400" height="210" />
 
 # Machine learned correcting functionals (MLCF)
