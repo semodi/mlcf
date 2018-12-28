@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -116,7 +115,6 @@ monomers_rotated*
 *.eps
 *.csv
 workdir/
-*.png
 h2o.*
 __pycache__/
 *.swp
