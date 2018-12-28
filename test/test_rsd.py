@@ -2,14 +2,15 @@ import pytest
 import unittest
 import mlc_func.elf.siesta as siesta
 from mlc_func.elf.geom import make_real, rotate_tensor, get_nncs_angles,\
- get_casimir, get_elfcs_angles, rotate_vector
+ get_casimir, get_elfcs_angles, rotate_vector, fold_back_coords
 from mlc_func.elf.real_space import Density, get_elfs, orient_elfs
 from ase.io import read
-from mlc_func.elf.utils import preprocess_all
-from mlc_func.elf.water import get_water_angles
+from mlc_func.elf.utils import preprocess_all, hdf5_to_elfs_fast, hdf5_to_elfs, elfs_to_hdf5, change_alignment
+from mlc_func.elf.water import get_water_angles, waterc_to_tip4p, tip4p_to_str
 import os
 import numpy as np
 import pickle
+from ase.io import read
 
 basis = {'r_o_o': 1.0,'r_i_o': 0.05, 'r_i_h': 0.0, 'r_o_h' : 1.5,
                       'n_rad_o' : 2,'n_rad_h' : 2, 'n_l_o' : 3,
@@ -22,6 +23,78 @@ for i, e in enumerate(elf):
     elf_list.append(e.value)
 elf = elf_list
 
+
+def test_water():
+
+    coords = atoms.get_positions()
+    tip4p = waterc_to_tip4p(coords)
+    tip4p_str = tip4p_to_str(tip4p)
+
+    # pickle.dump({'tip4p': tip4p, 'str': tip4p_str}, open('water_ref.pckl','wb'))
+    ref = pickle.load(open('./test/water_ref.pckl','rb'))
+    assert np.allclose(ref['tip4p'],tip4p)
+    assert tip4p_str == ref['str']
+def test_elf_utils():
+
+    preprocess_all('./test/', basis = basis)
+
+    def compare_csv(file1,file2):
+        assert np.allclose(np.genfromtxt(file1, delimiter = ','),
+                            np.genfromtxt(file2, delimiter = ','))
+
+
+    compare_csv('./test.energies', './test/util_ref/test.energies')
+    compare_csv('./test.forces', './test/util_ref/test.forces')
+    assert read('./test.traj',':') == read('./test/util_ref/test.traj',':')
+
+    def compare_elfs(file1, file2):
+        for i in range(2):
+            for spec in ['o','h']:
+                assert np.allclose(hdf5_to_elfs_fast(file1)[i][spec],
+                 hdf5_to_elfs_fast(file2)[i][spec])
+
+    compare_elfs('./test_processed.hdf5','./test/util_ref/test_processed.hdf5')
+
+    for spec in ['o','h']:
+        assert np.allclose(hdf5_to_elfs_fast('./test_processed.hdf5')[0][spec],
+         hdf5_to_elfs('./test_processed.hdf5',grouped=True, values_only=True)[spec])
+
+
+    reference_elfs = hdf5_to_elfs('./test/util_ref/test_processed.hdf5')
+    elfs_to_hdf5(reference_elfs, './test_saved.hdf5')
+
+
+    compare_elfs('./test_saved.hdf5','./test/util_ref/test_processed.hdf5')
+
+
+    preprocess_all('./test/', basis = basis, method = 'nn')
+    change_alignment('./test_processed.hdf5', './test.traj', new_method = 'elf',
+        save_as = './test_change_alignment.hdf5')
+
+    compare_elfs('./test_change_alignment.hdf5','./test/util_ref/test_processed.hdf5')
+    
+    os.remove('./test_change_alignment.hdf5')
+    os.remove('./test_processed.hdf5')
+    os.remove('./test.energies')
+    os.remove('./test.forces')
+    os.remove('./test.traj')
+    os.remove('./test_saved.hdf5')
+
+def test_siesta():
+    """ Test all routines that import data from SIESTA files
+    """
+
+    energy = siesta.get_energy('./test/0.out')
+    forces = siesta.get_forces('./test/0.out')
+    atoms = siesta.get_atoms('./test/0.out')
+
+    # pickle.dump({'energy': energy, 'forces': forces, 'atoms': atoms},
+     # open('./test/siesta_test.pckl','wb'))
+    ref = pickle.load(open('./test/siesta_test.pckl','rb'))
+    assert energy == ref['energy']
+    assert np.allclose(forces,ref['forces'])
+    assert atoms == ref['atoms']
+
 def test_rs_elf():
     """Test if the basic function get_elfs() works
     """
@@ -30,23 +103,6 @@ def test_rs_elf():
     for key in elf:
         assert np.allclose(elf[key], elf_ref[key])
 
-# def test_rot_invariance_elfcs():
-#     """Test if the ElF algorithm is rotationally invariant, by calculating oriented
-#     elfs for monomers that are rotated copies of each other
-#     """
-#     elfs = preprocess_all('./test/dimers_rotated_400', basis)
-#     elfs = np.array([e[0].value for e in elfs])
-#     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
-#     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
-#
-# def test_rot_invariance_nncs():
-#     """Test if the nearest-neighbor algorithm is rotationally invariant, by calculating
-#     oriented elfs for monomers that are rotated copies of each other
-#     """
-#     elfs = preprocess_all('./test/dimers_rotated', basis, method = 'nn')
-#     elfs = np.array([e[0].value for e in elfs])
-#     assert np.allclose(elfs[0],elfs[1], atol = 5e-2, rtol = 5e-3)
-#     assert np.allclose(elfs[1], elfs[2], atol = 5e-2, rtol = 5e-3)
 
 def test_watercs():
     """ Test whether nearest neighbor reproduces the reference values for elf
@@ -130,5 +186,55 @@ def test_orient_elfs():
     elf_ref = pickle.load(open('./test/elf_elfcs.dat','rb'))
     assert np.allclose(make_real(elf_ref), oriented)
 
+def test_rotate_tensor():
+    """Test certain algebraic properties of the rotate_tensor() routine
+    """
+    # Test identity and inverse
+    id = rotate_tensor(elf[0], [0,0,0])
+    rotated = rotate_tensor(elf[0], [1.2,0.3,0.1])
+    rotated = rotate_tensor(rotated, [1.2,0.3,0.1], inverse = True)
+    for key in elf[0]:
+        assert np.allclose(rotated[key], elf[0][key])
+        assert np.allclose(id[key], elf[0][key])
+
+    # Test if rotation preserves l2-norm
+    for angles in [[1.0,1.2,0.2],[0.3,3.6,2.3]]:
+        rotated = rotate_tensor(elf[0], angles)
+        casimir = get_casimir(elf[0])
+        casimir_rotated = get_casimir(rotated)
+        for key in casimir:
+            assert np.allclose(casimir[key],casimir_rotated[key])
+
+def test_rotate_vector():
+    """Test certain algebraic properties of the rotate_vector() routine
+    """
+    vec = np.array([[1.3, 0.2, 2.1],[0,1,2],[0,0,0],[1000.123,10.222234,11]])
+    ang = [0.15, 2.98, 5.16]
+    # Test identity and inverse
+    assert np.allclose(rotate_vector(vec,[0,0,0]),vec)
+    assert np.allclose(rotate_vector(rotate_vector(vec,ang),ang,True),vec)
+
+    assert np.allclose(np.linalg.norm(vec, axis=-1),
+                       np.linalg.norm(rotate_vector(vec,ang), axis=-1))
+
+def test_fold_back_coords():
+    """ Test whether the routine fold_back_coords correctly folds the
+    coordinates into the unitcell so that the distance between two points is
+    minimized
+    """
+    coords = np.array([[1,0,1],[19,18,-20]]).astype(float)
+    uc = (np.eye(3)*20).astype(float)
+
+    coords_folded = np.array([[1,0,1],[-1,-2,0]]).astype(float)
+    assert np.allclose(coords_folded,fold_back_coords(0,coords,uc))
+
+    uc2 = np.eye(3)
+    uc2[0,0] = 6
+    uc2[1,1] = 10
+    uc2[2,2] = 2.5
+
+    coords_folded_2 = np.array([[1,0,1],[1,-2,0]]).astype(float)
+    assert np.allclose(coords_folded_2,fold_back_coords(0,coords,uc2))
+
 if __name__ == '__main__':
-    test_elfcs()
+    pass
