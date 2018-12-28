@@ -14,6 +14,7 @@ To generate the Wigner-D matrices used to rotate electronic descriptors the foll
 
 `conda install -c moble spherical_functions`
 
+
 Afterwards, mlc_func can be installed by cloning this directory as follows:
 
 ```
@@ -21,6 +22,16 @@ git clone https://github.com/semodi/mlcf.git
 cd mlcf
 pip install -e .
 ```
+
+Alternatively, all dependencies can be conveniently installed with anaconda:
+
+```
+git clone https://github.com/semodi/mlcf.git
+cd mlcf
+conda env create -f environment.yml
+pip install -e .
+```
+In this case `sphercial_functions` need not be installed separately
 
 ## Modules
 
