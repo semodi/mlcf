@@ -39,20 +39,20 @@ class FeatureGetter():
             self.n_clients = 1
 
 class DescriptorGetter(FeatureGetter):
+    """ Reads the real space electron density and returns electronic descriptors
 
+    Parameters
+    ---
+
+        basis: dict
+            dictionary defining the basis
+        client: ipyparallel.client
+            for parallel processing
+        rhopath: str
+            path under which the electron density can be found after every MD step
+    """
     def __init__(self, basis, client = None, rhopath='./H2O.RHOXC'):
-        """ Reads the real space electron density and returns electronic descriptors
 
-        Parameters
-        ---
-
-            basis: dict
-                dictionary defining the basis
-            client: ipyparallel.client
-                for parallel processing
-            rhopath: str
-                path under which the electron density can be found after every MD step
-        """
         super().__init__(client = client)
         self.rhopath = rhopath
         self.basis = basis
@@ -89,7 +89,7 @@ class DescriptorGetter(FeatureGetter):
         Parameters
         -----------
             atoms, ase.Atoms
-            
+
         """
         # if not mask is set use all features
         for s in self.scalers:

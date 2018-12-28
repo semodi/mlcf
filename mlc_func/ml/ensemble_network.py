@@ -3,17 +3,16 @@ import numpy as np
 import copy
 
 class Ensemble_Network():
+    """Ensemble Network to obtain confidence intervals for predictions
+
+        Parameters
+        -----------
+            network: Network
+                root network from which to create ensemble
+            n: int
+                ensemble size
+    """
     def __init__(self, network, n = 3):
-        """Ensemble Network to obtain confidence intervals for predictions
-
-            Parameters
-            -----------
-                network: Network
-                    root network from which to create ensemble
-                n: int
-                    ensemble size
-        """
-
         self.models = []
         for _ in range(n):
             self.models.append(copy.copy(network))

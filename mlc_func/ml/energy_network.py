@@ -24,17 +24,17 @@ Dataset = namedtuple("Dataset", "data species")
 
 
 class Energy_Network():
+    """ Machine learned correcting functional (MLCF) for energies
 
+        Parameters
+        ----------
+
+            subnets: list of Subnetwork
+                each subnetwork belongs to a single atom inside the system
+                and computes the atomic contributio to the total energy
+    """
     def __init__(self, subnets):
-        """ Machine learned correcting functional (MLCF) for energies
 
-            Parameters
-            ----------
-
-                subnets: list of Subnetwork
-                    each subnetwork belongs to a single atom inside the system
-                    and computes the atomic contributio to the total energy
-        """
 
         if not isinstance(subnets, list):
             self.subnets = [subnets]

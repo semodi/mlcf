@@ -5,24 +5,23 @@ from ase.calculators.siesta.siesta import SiestaTrunk462 as Siesta
 import numpy as np
 
 class Mixer(Siesta):
+    """ASE Calculator that uses the time step mixing method defined in
+    E. Anglada, J. Junquera,  and J. M. Soler, Physical Review E68, 055701 (2003)
+
+    Parameters
+    -----------
+
+        fast_calculator: ase.Calculator
+            fast, "quick and dirty" method
+        slow_calculator: ase.Calculator
+            slow accurate method
+        n: int,
+            Mixing parameter, correct with slow calculator after n steps
+        correct_species: str
+            only apply correctiong to elements specified in this string.
+            Example: 'oh' only corrects Oxygen and Hydrogen
+    """
     def __init__(self, fast_calculator, slow_calculator, n, correct_species = ''):
-        """ASE Calculator that uses the time step mixing method defined in
-        E. Anglada, J. Junquera,  and J. M. Soler, Physical Review E68, 055701 (2003)
-
-        Parameters
-        -----------
-
-            fast_calculator: ase.Calculator
-                fast, "quick and dirty" method
-            slow_calculator: ase.Calculator
-                slow accurate method
-            n: int,
-                Mixing parameter, correct with slow calculator after n steps
-            correct_species: str
-                only apply correctiong to elements specified in this string.
-                Example: 'oh' only corrects Oxygen and Hydrogen
-        """
-
         try:
             shutil.os.mkdir('DM_save/')
         except FileExistsError:

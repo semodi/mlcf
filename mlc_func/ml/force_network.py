@@ -19,30 +19,29 @@ import json
 from ase.io import read
 
 class Force_Network():
+    """ MLCF for force perdiction
+
+    Parameters
+    ----------
+
+        species: str
+            chemical element symbol
+        scaler: sklearn Scaler
+        basis: dict
+            basis that was used to create electronic descriptors
+        datasets: dict
+            datasets provided as {'X_train': np.ndarray, 'X_test': etc...}
+        mask: list of bool
+            used to mask the features and filter out features with low variance
+        n_layers: int
+            number of hidden layers, default = 3
+        nodes_per_layer: int
+            nodes for each hidden layer, default = 8
+        b: float
+            l2-regularization strenght, default = 0
+    """
     def __init__(self, species, scaler, basis, datasets = {}, mask = [], n_layers = 3, nodes_per_layer = 8,
                 b = 0):
-        """ MLCF for force perdiction
-
-        Parameters
-        ----------
-
-            species: str
-                chemical element symbol
-            scaler: sklearn Scaler
-            basis: dict
-                basis that was used to create electronic descriptors
-            datasets: dict
-                datasets provided as {'X_train': np.ndarray, 'X_test': etc...}
-            mask: list of bool
-                used to mask the features and filter out features with low variance
-            n_layers: int
-                number of hidden layers, default = 3
-            nodes_per_layer: int
-                nodes for each hidden layer, default = 8
-            b: float
-                l2-regularization strenght, default = 0
-        """
-
         self.species = species
         self.n_layers = n_layers
         self.nodes_per_layer = nodes_per_layer

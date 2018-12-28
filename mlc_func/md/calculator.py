@@ -53,18 +53,18 @@ def log_all(energy_siesta = None, energy_corrected = None,
                 np.savetxt(file, features[key], fmt = '%.4f')
 
 class Siesta_Calculator(Siesta):
+    """ Provides default options for the Siesta calculator, such as pre-defined
+    custom basis sets and functionals.
+    Parameters
+    ----
+        basis, str
+            {'dz_custom','dz','qz_custom','sz','uf','szp'}, basis set to be used
 
+        xc: str
+             {'PBE','BH','PW92','revPBE', ...}, exchange-correlation functional
+    """
     def __init__(self, basis = 'qz', xc='BH'):
-        """ Provides default options for the Siesta calculator, such as pre-defined
-        custom basis sets and functionals.
-        Parameters
-        ----
-            basis, str
-                {'dz_custom','dz','qz_custom','sz','uf','szp'}, basis set to be used
 
-            xc: str
-                 {'PBE','BH','PW92','revPBE', ...}, exchange-correlation functional
-        """
         label = 'H2O' #TODO: for now, change later
         if xc =='REVPBE': xc = 'revPBE'
 
@@ -144,23 +144,21 @@ class Siesta_Calculator(Siesta):
         self.read_forces_stress()
 
 class MLCF_Calculator:
+    """MLCF_Calculator that consists of a baseline calculator (base_calculator), e.g. Siesta,
+    and a Machine learned correcting functional (MLCF).
 
+    Parameters
+    ---
+
+        base_calculator: ase.Calculator
+            baseline method to get first approximation to forces
+        feature_getter: FeatureGetter
+            read the electron density and transforms it into features (electronic fingerprints)
+        log_accuracy: bool
+            whether to log energies, forces and features during MD simulation, default: True
+    """
     def __init__(self, base_calculator = None, feature_getter = None,
                     log_accuracy = True):
-        """MLCF_Calculator that consists of a baseline calculator (base_calculator), e.g. Siesta,
-        and a Machine learned correcting functional (MLCF).
-
-        Parameters
-        ---
-
-            base_calculator: ase.Calculator
-                baseline method to get first approximation to forces
-            feature_getter: FeatureGetter
-                read the electron density and transforms it into features (electronic fingerprints)
-            log_accuracy: bool
-                whether to log energies, forces and features during MD simulation, default: True
-        """
-
         self.force_models = {}
         self.last_positions = None
         self.Epot = 0
