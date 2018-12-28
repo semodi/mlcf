@@ -26,7 +26,7 @@ geom
     :members:
 
 water
------   
+-----
 .. automodule:: mlc_func.elf.water
     :members:
 
@@ -43,7 +43,7 @@ ml
 energy_network
 --------------
 
-.. automodule:: mlc_func.ml.energy_network
+.. automodule:: mlc_func.ml.network
     :members:
 
 force_network
@@ -62,7 +62,7 @@ md
 =====
 
 .. automodule:: mlc_func.md
-   :members: 
+   :members:
 
 calculator
 ----------------
@@ -83,4 +83,3 @@ mixer
 ----------------
 .. automodule:: mlc_func.md.mixer
     :members:
-

@@ -20,6 +20,7 @@ from collections import namedtuple
 import h5py
 import json
 from ase.io import read
+import mlc_func.elf as elf
 Dataset = namedtuple("Dataset", "data species")
 
 
@@ -729,6 +730,7 @@ class Subnet():
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
 
+
 def load_energy_model(path):
     """ Load energy MLCF
 
@@ -824,7 +826,7 @@ def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
                     targets, test_size = 0.2)
 
         sets.append(subnets)
-    network = Network(sets)
+    network = Energy_Network(sets)
     network.masks = masks
     return network
 
