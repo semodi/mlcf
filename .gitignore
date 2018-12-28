@@ -106,7 +106,6 @@ venv.bak/
 publication/
 jupyter/log/
 test/rho/
-test/*/
 basis/
 data/
 models/
