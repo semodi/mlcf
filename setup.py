@@ -10,7 +10,7 @@ if __name__ == "__main__":
         url="",
         license='BSD-3C',
         packages=setuptools.find_packages(),
-        python_requires='>=3.6',
+        python_requires='>=3.2',
         install_requires=[
             'numpy',
             'sympy',
@@ -23,11 +23,11 @@ if __name__ == "__main__":
             'numba',
             'cython',
             'tensorflow',
-            'keras'
+            'keras',
         ],
         extras_require={
             'docs': [
-                'sphinx==1.2.3',  # autodoc was broken in 1.3.1
+                'sphinx==1.7',  # autodoc was broken in 1.3.1
                 'sphinxcontrib-napoleon',
                 'sphinx_rtd_theme',
                 'numpydoc',

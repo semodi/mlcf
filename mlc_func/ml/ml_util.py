@@ -9,15 +9,18 @@ import tensorflow as tf
 def fc_nn(network):
     """Builds a fully connected neural network
 
-    Input parameters:
+    Parameters
     -----------------
-        network: subnet; subnet object
+        network: Subnet
 
-    Returns:
+    Returns
     --------
-        logits: tensorflow tensor; output layer of neural network
-        x: tensorflow placeholder; input layer
-        y:  tensorflow placeholder; placeholder for target values
+        logits: tensorflow tensor
+            output layer of neural network
+        x: tensorflow placeholder
+            input layer
+        y:  tensorflow placeholder
+            placeholder for target values
         """
 
 
@@ -60,18 +63,25 @@ def fc_nn_g(network, i, mean = 0, std = 1):
     """Builds a fully connected neural network that consists of network.n_copies
     copies of a subnetwork
 
-    Input parameters:
-    -----------------
-        network: subnet; subnet object
-        i: int; index to label placeholders (for multiple datasets)
-        mean: float; mean target value
-        std: float; standard deviation of target values
+    Parameters
+    ----------
+        network: Subnet
+            subnet object
+        i: int
+            index to label placeholders (for multiple datasets)
+        mean: float
+            mean target value
+        std: float
+            standard deviation of target values
 
-    Returns:
+    Returns
     --------
-        logits: tensorflow tensor; output layer of neural network
-        x: tensorflow placeholder; input layer
-        y:  tensorflow placeholder; placeholder for target values
+        logits: tensorflow tensor
+            output layer of neural network
+        x: tensorflow placeholder
+            input layer
+        y:  tensorflow placeholder
+            placeholder for target values
         """
 
     features = network.features
@@ -131,14 +141,3 @@ def initialize_uninitialized(sess):
     # print([str(i.name) for i in not_initialized_vars]) # only for testing
     if len(not_initialized_vars):
         sess.run(tf.variables_initializer(not_initialized_vars))
-
-def get_batch_feed(feed_dict, start, batch_size):
-
-    batch_feed_dict = {}
-    for key in feed_dict:
-        if feed_dict[key].ndim == 2:
-            batch_feed_dict[key] = feed_dict[key][start:batch_size]
-        else:
-            batch_feed_dict[key] = feed_dict[key][:, start:batch_size, :]
-
-    return batch_feed_dict

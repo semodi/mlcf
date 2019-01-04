@@ -1,3 +1,5 @@
+""" This driver can be used to run MD simulations using Siesta together with MLCFs
+"""
 #!/usr/bin/env python
 import mlc_func as mlcf
 import os

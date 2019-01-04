@@ -10,11 +10,26 @@ import ipyparallel as ipp
 import re
 import pandas as pd
 from mlc_func.elf.siesta import get_density, get_density_bin, get_atoms, get_forces, get_energy
-from mlc_func.elf.real_space import get_elfs_oriented, orient_elfs
+from .real_space import get_elfs_oriented, orient_elfs
 from mlc_func.elf.geom import make_complex, rotate_tensor
 from .serial_view import serial_view
 
 def get_view(profile = 'default', n = -1):
+    """
+    Load ipyparallel balanced_view
+
+    Parameters
+    ---
+        profile: str
+            ipyparallel profile, default='default'
+        n: int
+            use n workers, default=-1 (use all workers)
+
+    Returns
+    ----
+        ipyparallel.balanced_view
+
+    """
     client = ipp.Client(profile = profile)
     # view = client.load_balanced_view()
     if n == -1:
@@ -34,7 +49,6 @@ def __get_elfs(path, atoms, basis, method):
 
 
 def __get_all(paths, method, basis, add_ext, dens_ext, n_atoms):
-
 
     atoms = list(map(get_atoms,[p + '.' + add_ext for p in paths],[n_atoms]*len(paths)))
     elfs = list(map(__get_elfs, [p + '.' + dens_ext for p in paths],
@@ -56,7 +70,38 @@ def natural_keys(text):
 
 def preprocess_all(root, basis, dens_ext = 'RHOXC',
     add_ext = 'out', method = 'elf', view = serial_view(), n_atoms = -1):
+    """ Given a root directory, walk directory tree and find all files ending in dens_ext and transform
+    electron density into descriptors.
 
+    Parameters
+    ----------
+
+        root: str
+            root directory containing all data
+        basis: dict
+            basis to use to create descriptors
+        dens_ext: str
+            extension for electron density files
+        add_ext: str
+            extension for other file containing structural information (atomic positions)
+        method: str
+            {'elf','nn','water','neutral'}, pick alignment method
+        view: ipyparallel.balanced_view
+            for parallel processing
+        n_atoms: int
+            only process the first n_atoms atoms in each system,
+            default: -1 (all atoms)
+
+    Returns
+    --------
+        list of ElF
+            containing the created descriptors
+
+    Other
+    -------
+        Saves energies, forces in a csv file, the structural information in an ase .traj file,
+        the descriptors in a .hdf5 file
+    """
 
     if root[-1] == '/': root = root[:-1]
     if root[0] != '/' and root[0] != '~':
@@ -109,6 +154,21 @@ def preprocess_all(root, basis, dens_ext = 'RHOXC',
     return elfs
 
 def elfs_to_hdf5(elfs, path):
+    """
+    Given a list of electronic desriptors (ElFs) save them in an .hdf5 file
+
+    Parameters
+    ----------
+
+        elfs: list of ElFs
+            to save
+        path: str
+            file destination
+
+    Returns
+    --------
+        None
+    """
 
     # TODO: Option to check for consistency across systems
     file = h5py.File(path, 'w')
@@ -153,6 +213,28 @@ def elfs_to_hdf5(elfs, path):
 
 def hdf5_to_elfs(path, species_filter = '', grouped = False,
         values_only = False, angles_only = False):
+    """ Loads .hdf5 file that stores electronic descriptors (ElFs) and returns them
+
+    Parameters
+    -----------
+
+        path: str
+        file origin
+        species_filter: str
+            only load elements specified in this string
+        grouped: boolean
+            return a dictionary that groups values by element
+        values_only: boolean
+            only return the descriptor values (tensor)
+        angles_only: boolean
+            only return the descriptor angles
+
+    Returns:
+    --------
+
+        list of ElFs / dict (if grouped = True) / np.ndarray (if either values_only or angles_only = True)
+            ElFs from hdf5 file
+    """
 
     file = h5py.File(path, 'r')
     basis = json.loads(file.attrs['basis'])
@@ -210,35 +292,75 @@ def hdf5_to_elfs(path, species_filter = '', grouped = False,
     return elfs
 
 def hdf5_to_elfs_fast(path, species_filter = ''):
+    """ Loads .hdf5 file that stores electronic descriptors (ElFs) and returns themself.
+    Faster implementation of hdf5_to_elfs. Only works for homogeneous datasets.
 
-        file = h5py.File(path, 'r')
-        basis = json.loads(file.attrs['basis'])
-        print(basis)
+    Parameters
+    -----------
 
-        values_dict = {}
-        angles_dict = {}
-        values = file['value'][:]
-        angles = file['angles'][:]
-        all_species = file['species'][:]
-        all_lengths = file['length'][:]
-        systems = file['system'][:]
-        unique_systems, count_system = np.unique(systems,return_counts=True)
-        if not len(np.unique(count_system)) == 1:
-            raise Exception('Dataset not homogeneous, use hdf5_to_elfs() instead')
-        else:
-            n_systems = len(unique_systems)
-        if len(species_filter) == 0:
-            species_filter = [s.astype(str).lower() for s in np.unique(all_species)]
+        path: str
+            file origin
+        species_filter: str
+            only load elements specified in this string
 
-        for species in species_filter:
-            filt = ((all_species.astype(str) == species.upper()) | (all_species.astype(str) == species.lower()))
-            length = all_lengths[np.where(filt)[0][0]]
-            values_dict[species] = values[filt,:length].reshape(n_systems,-1,length)
-            angles_dict[species] = angles[filt,:].reshape(n_systems,-1,3)
+    Returns
+    --------
 
-        return values_dict, angles_dict
+        (dict, dict)
+            containing values and angles for each element respectively
+
+    """
+
+    file = h5py.File(path, 'r')
+    basis = json.loads(file.attrs['basis'])
+    print(basis)
+
+    values_dict = {}
+    angles_dict = {}
+    values = file['value'][:]
+    angles = file['angles'][:]
+    all_species = file['species'][:]
+    all_lengths = file['length'][:]
+    systems = file['system'][:]
+    unique_systems, count_system = np.unique(systems,return_counts=True)
+    if not len(np.unique(count_system)) == 1:
+        raise Exception('Dataset not homogeneous, use hdf5_to_elfs() instead')
+    else:
+        n_systems = len(unique_systems)
+    if len(species_filter) == 0:
+        species_filter = [s.astype(str).lower() for s in np.unique(all_species)]
+
+    for species in species_filter:
+        filt = ((all_species.astype(str) == species.upper()) | (all_species.astype(str) == species.lower()))
+        length = all_lengths[np.where(filt)[0][0]]
+        values_dict[species] = values[filt,:length].reshape(n_systems,-1,length)
+        angles_dict[species] = angles[filt,:].reshape(n_systems,-1,3)
+
+    return values_dict, angles_dict
 
 def change_alignment(path, traj_path, new_method, save_as = None):
+    """ Transform ElFs from one local coordinate system to another one specified in
+    new_method
+
+    Parameters
+    ----------
+        path: str
+            file origin
+        traj_path: str
+            path to .traj or .xyz containing the atomic positions
+        new_method: str
+            {'elf','nn','water','neutral'}, method defining the local coordinate system
+        save_as: str
+            destination file to save ElFs, default=None (don't save)
+
+    Returns
+    ---------
+        list of ElF
+            if save_as == None returns list of electronic descriptors (ElFs)
+            otherwise returns None
+
+    """
+
     elfs = hdf5_to_elfs(path)
     atoms = read(traj_path, ':')
 

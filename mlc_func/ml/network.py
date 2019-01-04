@@ -1,5 +1,5 @@
-""" Module that implements Network, a class that combines several subnets
-to build a master neural network that can be trained on datasets.
+""" Module that implements Energy_Network, the machine learned correcting functional (MLCF)
+for energies
 """
 
 import numpy as np
@@ -17,17 +17,31 @@ from matplotlib import pyplot as plt
 import math
 import pickle
 from collections import namedtuple
+import h5py
+import json
+from ase.io import read
+import mlc_func.elf as elf
 Dataset = namedtuple("Dataset", "data species")
 
 
-class Network():
+class Energy_Network():
+    """ Machine learned correcting functional (MLCF) for energies
 
+        Parameters
+        ----------
+
+            subnets: list of Subnetwork
+                each subnetwork belongs to a single atom inside the system
+                and computes the atomic contributio to the total energy
+    """
     def __init__(self, subnets):
+
 
         if not isinstance(subnets, list):
             self.subnets = [subnets]
         else:
             self.subnets = subnets
+
 
         self.model_loaded = False
         self.rand_state = np.random.get_state()
@@ -40,6 +54,9 @@ class Network():
         self.optimizer = None
         self.checkpoint_path = None
         self.masks = {}
+        self.species_nets = {}
+        self.species_nets_names = {}
+        self.species_gradients_names = {}
         scale_together(subnets)
 
     # ========= Network operations ============ #
@@ -58,7 +75,7 @@ class Network():
     def __mod__(self, other):
         if isinstance(other, Subnet):
             self.subnets += [[other]]
-        elif isinstance(other, Network):
+        elif isinstance(other, Energy_Network):
             self.subnets += other.subnets
         else:
             raise Exception("Datatypes not compatible")
@@ -71,6 +88,7 @@ class Network():
         self.initialized = False
         self.optimizer = None
         self.checkpoint_path = None
+
 
     def construct_network(self):
         """ Builds the tensorflow graph from subnets
@@ -94,16 +112,20 @@ class Network():
     def get_feed(self, which = 'train', train_valid_split = 0.8, seed = 42):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train',test'}, which part of the dataset is used
-        train_valid_split: float; ratio of train and validation set size
-        seed: int; seed parameter for the random shuffle algorithm, make
+            which: {'train',test'}
+                which part of the dataset is used
+            train_valid_split: float
+                ratio of train and validation set size
+            seed: int
+                seed parameter for the random shuffle algorithm, make
 
-        Returns:
+        Returns
         --------
-        (dictionary, dictionary): either (training feed dictionary, validation feed dict.)
-                                or (testing feed dictionary, None)
+            (dictionary, dictionary)
+                either (training feed dictionary, validation feed dict.)
+                or (testing feed dictionary, None)
         """
         train_feed_dict = {}
         valid_feed_dict = {}
@@ -131,8 +153,9 @@ class Network():
 
         Returns
         -------
-        cost_list: [tensorflow.placeholder]; list of costs for subnets. subnets
-            whose outputs are added together share cost functions
+            cost_list: [tensorflow.placeholder]
+                list of costs for subnets. subnets
+                whose outputs are added together share cost functions
         """
         cost_list = []
 
@@ -166,19 +189,27 @@ class Network():
 
         """ Train the master neural network
 
-        Parameters:
-        ----------
-        step_size: float; step size for gradient descent
-        max_steps: int; number of training epochs
-        b: float; regularization parameter
-        verbose: boolean; print cost for intermediate training epochs
-        optimizer: {tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...}
-        adaptive_rate: boolean; wether to adjust step_size if cost increases
-                        not recommended for AdamOptimizer
+            Parameters
+            ----------
+                step_size: float
+                    step size for gradient descent
+                max_steps: int
+                    number of training epochs
+                b: float
+                    regularization parameter
+                verbose: boolean
+                    print cost for intermediate training epochs
+                optimizer: tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...
+                adaptive_rate: boolean
+                    wether to adjust step_size if cost increases
+                                not recommended for AdamOptimizer
+                multiplier: list of float
+                    multiplier that allow to give datasets more
+                    weight than others
 
-        Returns:
-        --------
-        None
+            Returns
+            --------
+            None
         """
 
 
@@ -307,61 +338,102 @@ class Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, data, species, use_masks = False):
+    def predict(self, features, species, use_masks = False, return_gradient = False):
+        """ Get predicted energies
 
-        if data.ndim == 2:
-            data = data.reshape(-1,1,data.shape[1])
+        Parameters
+        ----------
+        features: np.ndarray
+            input features
+        species: str
+            predict atomic contribution to energy for this species
+        use_masks: bool
+             whether masks should be applied to the provided features
+        return_gradient: bool
+            instead of returning energies, return gradient of network
+            w.r.t. input features
+
+        Returns
+        -------
+        np.ndarray
+            predicted energies or gradient
+
+        """
+        species = species.lower()
+        if features.ndim == 2:
+            features = features.reshape(-1,1,features.shape[1])
         else:
-            raise Exception('data.ndim != 2')
+            raise Exception('features.ndim != 2')
         if use_masks:
-            data = data[:,:,self.masks[species]]
+            features = features[:,:,self.masks[species]]
 
-        ds = Dataset(data, species)
-        targets = np.zeros(data.shape[0])
-        snet = Subnet()
+        ds = Dataset(features, species)
+        targets = np.zeros(features.shape[0])
 
-        found = False
-        for s in self.subnets:
-            if found == True:
-                break
-            if isinstance(s,list):
-                for s2 in s:
-                    if s2.species == ds.species:
-                        snet.scaler = s2.scaler
-                        snet.layers = s2.layers
-                        snet.targets = s2.targets
-                        snet.activations = s2.activations
-                        print("Sharing scaler with species " + s2.species)
-                        found = True
-                        break
-            else:
-                if s.species == ds.species:
-                    snet.scaler = s.scaler
-                    snet.layers = s.layers
-                    snet.targets = s.targets
-                    snet.activations = s.activations
-                    print("Sharing scaler with species " + s.species)
+        if not species in self.species_nets:
+            self.species_nets[species] = Subnet()
+            found = False
+
+            snet = self.species_nets[species]
+            for s in self.subnets:
+                if found == True:
                     break
+                if isinstance(s,list):
+                    for s2 in s:
+                        if s2.species == ds.species:
+                            snet.scaler = s2.scaler
+                            snet.layers = s2.layers
+                            snet.targets = s2.targets
+                            snet.activations = s2.activations
+                            print("Sharing scaler with species " + s2.species)
+                            found = True
+                            break
+                else:
+                    if s.species == ds.species:
+                        snet.scaler = s.scaler
+                        snet.layers = s.layers
+                        snet.targets = s.targets
+                        snet.activations = s.activations
+                        print("Sharing scaler with species " + s.species)
+                        break
 
+        snet = self.species_nets[species]
         snet.add_dataset(ds, targets, test_size=0.0)
-        self = self % snet
+        if not self.model_loaded:
+            raise Exception('Model not loaded!')
+        else:
+            with self.graph.as_default():
+                if species in self.species_nets_names:
+                    logits = self.graph.get_tensor_by_name(self.species_nets_names[species])
+                    gradients = self.graph.get_tensor_by_name(self.species_gradients_names[species])
+                else:
+                    logits, x, _ = snet.get_logits(1)
+                    gradients = tf.gradients(logits, x)[0].values
+                    self.species_nets_names[species] = logits.name
+                    self.species_gradients_names[species] = gradients.name
+                sess = self.sess
+                energies = sess.run(logits, feed_dict=snet.get_feed(which='train',
+                     train_valid_split=1.0))
+                if return_gradient:
+                    grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
+                     train_valid_split=1.0))[0]
+                    grad = grad/np.sqrt(snet.scaler.var_).reshape(1,-1)
+                    energies = (energies, grad)
 
-        result = self.get_logits()[-1]
+                return energies
 
-        del self.subnets[-1]
-
-        return result
-
-    def get_logits(self, summarize = True, which = 'train'):
+    def get_energies(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train','test'}; which set logits are computed for
+        which: str
+            {'train','test'} which set logits are computed for
 
-        Returns:
+        Returns
         --------
-        [numpy.array]; resulting logits grouped by independent subnet datasets
+         list of numpy.ndarray
+            resulting energies grouped by independent subnet datasets
         """
 
         if not self.model_loaded:
@@ -391,7 +463,7 @@ class Network():
                 return return_list
 
     def save_model(self, path):
-        """ Save trained m = tf.train.AdamOptimizer(learning_rate = step_size)
+        """ Save trained model to path
         """
 
         if path[-5:] == '.ckpt':
@@ -424,7 +496,8 @@ class Network():
 
     def save_all(self, net_dir, override = False):
         """ Saves the model including all subnets and datasets
-        using pickle
+        using pickle to directory net_dir, if directory exists only
+        save if override = True
         """
         try:
             os.mkdir(net_dir)
@@ -443,12 +516,15 @@ class Network():
         with open(os.path.join(net_dir,'subnets'),'wb') as file:
             pickle.dump(self.subnets,file)
 
+        to_save = {'mask': self.masks}
+
         self.save_model(os.path.join(net_dir,'model'))
 
+        pickle.dump(to_save, open(os.path.join(net_dir,'supp'), 'wb'))
 
 
     def load_all(self, net_dir):
-        """ Loads the model including all subnets and datasets
+        """ Loads the model in net_dir including all subnets and datasets
         using pickle
         """
 
@@ -456,7 +532,7 @@ class Network():
             self.subnets = pickle.load(file)
 
         self.restore_model(os.path.join(net_dir,'model'))
-        self.masks = pickle.load(open(net_dir + '/' +'masks', 'rb'))
+        self.masks = pickle.load(open(os.path.join(net_dir,'supp'), 'rb'))['mask']
 
 class Subnet():
     """ Subnetwork that is associated with one Atom
@@ -487,27 +563,31 @@ class Subnet():
         if not isinstance(other,Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Network([[self,other]])
+            return Energy_Network([[self,other]])
 
     def __mod__(self, other):
         if not isinstance(other,Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Network([[self],[other]])
+            return Energy_Network([[self],[other]])
 
 
     def get_feed(self, which, train_valid_split = 0.8, seed = None):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
-        Parameters:
+        Parameters
         -----------
-        which: {'train', 'valid', 'test'}, which part of the dataset is used
-        train_valid_split: float; ratio of train and validation set size
-        seed: int; seed parameter for the random shuffle algorithm, make
+            which: str,
+                {'train', 'valid', 'test'}
+                which part of the dataset is used
+            train_valid_split: float
+                ratio of train and validation set size
+            seed: int
+                seed parameter for the random shuffle algorithm
 
-        Returns:
+        Returns
         --------
-        dictionary
+            dict
         """
         if seed == None:
             seed = Subnet.seed
@@ -544,13 +624,14 @@ class Subnet():
     def get_logits(self, i):
         """ Builds the subnetwork by defining logits and placeholders
 
-        Parameters:
+        Parameters
         -----------
-        i: int; index to label datasets
+            i: int
+                index to label datasets
 
-        Returns:
+        Returns
         ---------
-        logits, x, y: tensorflow tensors
+            tensorflow tensors
         """
 
         with tf.variable_scope(self.name) as scope:
@@ -583,17 +664,17 @@ class Subnet():
         test_size = 0.2, target_filter = None, scale = True):
         """ Adds dataset to the subnetwork.
 
-        Parameters:
-        -----------
-        dataset: dataset (a named tuple (data, species, n_copies)); contains
-            datasets that will be associated with subnetwork for training and
-            evaluation
-        targets: (?,1) or (?) numpy array; target values for training and
-            evaluation
+            Parameters
+            -----------
+                dataset: dataset
+                    contains datasets that will be associated with subnetwork for training and
+                    evaluation
+                targets: np.ndarray
+                    target values for training and evaluation
 
-        Returns:
-        --------
-        None
+            Returns
+            --------
+                None
         """
 
         if self.species != None:
@@ -649,7 +730,129 @@ class Subnet():
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
 
-def load_network(path):
-    network = Network([])
+
+def load_energy_model(path):
+    """ Load energy MLCF
+
+        Parameters
+        ---------
+            path: str
+                directory in which energy MLCF is stored
+
+        Returns
+        -------
+            Energy_Network
+    """
+    network = Energy_Network([])
     network.load_all(path)
     return network
+
+def build_energy_mlcf(feature_src, target_src, masks = {}, automask_std = 0,
+    filters = [], autofilt_percent = 0, test_size = 0.2):
+
+    """ Return a trainable energy MLCF (neural network)
+
+    Parameters
+    ----------
+
+        feature_src: list
+            list of paths to the hdf5 containing the features
+        target_src: list
+            list of paths to the csv files containing the target energies
+            entries in target_scr and feature_src correspond to each other
+        masks: dict,
+            containing list booleans; can be used to select which features to use.
+            keys specify the atomic species.
+            default: use all features
+
+        automask_std: float,
+            if mask not set exclude all features whose stdev across dataset
+            is smaller than this value
+
+        filters: list,
+            containing list of booleans; can be used to exclude datapoints
+            in sets (e.g. outliers)
+
+        autofilt_percent: float,
+            exclude this percentile of extreme datapoints from set
+            (only if filters not set)
+        test_size: float,
+            relative size of hold_out (test) set
+    Returns
+    -------
+
+        Energy_Network
+
+    """
+
+    if not len(feature_src) == len(target_src):
+        raise Exception('Please provided only one target location for each feature set')
+
+    sets = []
+    if len(filters) != len(feature_src):
+        filters = [0]*len(feature_src)
+
+    no_mask = False
+
+    for fsrc, tsrc, filter in zip(feature_src, target_src, filters):
+
+        elfs, _ = elf.utils.hdf5_to_elfs_fast(fsrc)
+
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+
+        if not isinstance(filter, list) and not isinstance(filter, np.ndarray):
+
+            percentile_cutoff = autofilt_percent
+            lim1 = np.percentile(targets, percentile_cutoff*100)
+            lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+            min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+            filter = (targets > min_lim) & (targets < max_lim)
+
+        if len(masks) != len(elfs):
+            no_mask = True
+            for species in elfs:
+                feat = np.array(elfs[species])
+                masks[species] = (np.std(feat.reshape(-1,feat.shape[-1]),
+                        axis = 0) > automask_std)
+
+        targets = targets[filter]
+        subnets = []
+        for species in elfs:
+            feat = np.array(elfs[species])[:,:,masks[species]]
+            feat = feat[filter]
+            for j in range(feat.shape[1]):
+                subnets.append(Subnet())
+                subnets[-1].add_dataset(Dataset(feat[:,j:j+1], species),
+                    targets, test_size = 0.2)
+
+        sets.append(subnets)
+    network = Energy_Network(sets)
+    network.masks = masks
+    return network
+
+def get_energy_filters(target_src, autofilt_percent = 0):
+    """ For a given energy target dataset return filter that cutoff the
+    upper and lower percentile specified in autofilt_percent
+
+    Parameters
+    ----------
+    target_src: str
+        path of csv file containing energy targets
+    autofilt_percent: float
+        percentile to cut off
+
+    Returns
+    --------
+        list of bool
+            filters
+    """
+    filters = []
+    for tsrc in target_src:
+        targets = np.genfromtxt(tsrc, delimiter = ',')
+        percentile_cutoff = autofilt_percent
+        lim1 = np.percentile(targets, percentile_cutoff*100)
+        lim2 = np.percentile(targets, (1 - percentile_cutoff)*100)
+        min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+        filter = (targets > min_lim) & (targets < max_lim)
+        filters.append(filter)
+    return filters

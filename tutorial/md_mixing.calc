@@ -1,0 +1,18 @@
+
+# Enable mixing ( n-1 fast steps with alternate with 1 slow step)
+mixing True
+
+%block mixing
+# Basis, xc-functional and MLCF model used for fast steps
+basis1 sz
+xcfunctional1 PBE
+model1 ../model/
+
+# Basis, xc-functional and MLCF model used for slow steps
+# dz_custom is a double zeta polarized basis set optimized for water
+basis2 dz_custom 
+xcfunctional2 PBE
+
+# Mixing period
+n 10
+%endblock mixing
