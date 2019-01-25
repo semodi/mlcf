@@ -13,17 +13,16 @@ from ase import units as ase_units
 from ase.md import logger
 import numpy as np
 import shutil
-from mlc_func import Timer
+from mlc_func.timer import Timer
 import argparse
 try:
     from mbpol_calculator import MbpolCalculator
     MBPOL_AVAIL = True
 except ImportError:
     MBPOL_AVAIL = False
-from mlc_func.calculator import ListIntegrator
+from mlc_func.md import ListIntegrator
 
 os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
-os.environ['QT_QPA_PLATFORM']='offscreen'
 
 def log_all(energies = None, forces= None, coords = None):
     with open('energies.dat', 'a') as file:
@@ -95,12 +94,12 @@ if __name__ == '__main__':
     os.chdir(workdir)
 
 
-    calculator = mlcf.calculator.load_from_file(args.calcfile)
+    calculator = mlcf.md.load_calculator_from_file(args.calcfile)
     if not args.integrator.lower() == 'list':
         traj = io.Trajectory('../' + args.name  + '.traj',
                          mode = 'a', atoms = atoms)
 
-    if isinstance(calculator, mlcf.calculator.Mixer):
+    if isinstance(calculator, mlcf.md.calculator.Mixer):
         if isinstance(calculator.fast_calculator, MbpolCalculator):
             calculator.fast_calculator = MbpolCalculator(atoms)
         if isinstance(calculator.slow_calculator, MbpolCalculator):
@@ -127,7 +126,7 @@ if __name__ == '__main__':
                              trajectory=traj,
                              logfile= '../'+ args.name + '.log')
     elif args.integrator.lower() == 'list':
-        dyn = ListIntegrator(atoms, args.calcfile, args.np)
+        dyn = ListIntegrator(atoms, args.calcfile)
         args.Nt = 1
     else:
         raise Exception('Unknown integrator')

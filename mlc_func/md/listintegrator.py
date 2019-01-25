@@ -9,12 +9,12 @@ import shutil
 
 def single_thread(atoms_list, calcfile, env):
     import os
-    from mlc_func.calculator import read_input
+    from mlc_func.md.read_input import read_input
     os.environ['QT_QPA_PLATFORM']='offscreen'
     os.environ['SIESTA_COMMAND'] = env['SIESTA_COMMAND']
     os.environ['SIESTA_PP_PATH'] = env['SIESTA_PP_PATH']
     os.environ['SIESTA_WORKING_DIR'] = env['SIESTA_WORKING_DIR']
-    os.chdir(env['SIESTA_WORKING_DIR'])
+    #os.chdir(env['SIESTA_WORKING_DIR'])
     calculator = load_from_file(calcfile)
     results = []
 
