@@ -338,7 +338,8 @@ class Energy_Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, features, species, use_masks = False, return_gradient = False):
+    def predict(self, features, species, use_masks = False,
+        use_scaler = True, return_gradient = False):
         """ Get predicted energies
 
         Parameters
@@ -398,7 +399,7 @@ class Energy_Network():
                         break
 
         snet = self.species_nets[species]
-        snet.add_dataset(ds, targets, test_size=0.0)
+        snet.add_dataset(ds, targets, test_size=0.0, scale = use_scaler)
         if not self.model_loaded:
             raise Exception('Model not loaded!')
         else:
@@ -421,6 +422,17 @@ class Energy_Network():
                     energies = (energies, grad)
 
                 return energies
+
+    def get_weights(self, species, subnet):
+        weights = []
+        bs = []
+        with self.graph.as_default():
+            with tf.variable_scope("", reuse=True):
+                for l, layer in enumerate(subnet.layers + ['last']):
+                    weights.append(self.sess.run(tf.get_variable('{}/W{}'.format(species, l+1))))
+                    bs.append(self.sess.run(tf.get_variable('{}/b{}'.format(species, l+1))))
+
+        return weights, bs
 
     def get_energies(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
@@ -729,6 +741,7 @@ class Subnet():
 
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
+
 
 
 def load_energy_model(path):
