@@ -422,6 +422,15 @@ class Energy_Network():
 
                 return energies
 
+    def get_weights(self, species, subnet):
+        W = []
+        b = []
+        with self.graph.as_default():
+            with tf.variable_scope("", reuse=True):
+                for l, layer in enumerate(subnet.layers + ['']):
+                    W.append(self.sess.run(tf.get_variable("{}/W{}".format(species, l + 1))))
+                    b.append(self.sess.run(tf.get_variable("{}/b{}".format(species, l + 1))))
+        return W, b
     def get_energies(self, summarize = True, which = 'train'):
         """ Uses trained model on training or test sets
 
