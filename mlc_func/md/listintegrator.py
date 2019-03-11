@@ -25,10 +25,12 @@ def single_thread(atoms_list, calcfile, env):
         except FileExistsError:
             pass
         os.chdir('{}'.format(sys_idx))
-        atoms.calc = calculator
-        pe = atoms.get_potential_energy()
-        forces = atoms.get_forces()
-        results.append({sys_idx: [pe, forces]})
+        if not os.path.isfile('0_NORMAL_EXIT'):
+            atoms.calc = calculator
+            pe = atoms.get_potential_energy()
+            forces = atoms.get_forces()
+            results.append({sys_idx: [pe, forces]})
+
         os.chdir('../')
     return results
 
@@ -52,10 +54,10 @@ class ListIntegrator():
         if settings['ipp_client'] != None:
             client = ipp.Client(profile=settings['ipp_client'])
             self.view = client.load_balanced_view()
+            print(len(client[:]))
         else:
             self.view = serial_view()
 
-        print(len(client[:]))
         atoms_indexed = [{i: a} for i, a in enumerate(atoms)]
         print(atoms_indexed)
         n_workers = len(self.view)

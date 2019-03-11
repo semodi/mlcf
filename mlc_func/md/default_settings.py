@@ -1,5 +1,5 @@
 default_settings = {'solutionmethod': ['diagon','omm'],
-                'basis': ['dz_custom','dz','qz_custom','sz','uf','szp'],
+                'basis': ['dz_custom','dz','dzp','qzp','tzp','qz_custom','sz','uf','szp'],
                 'xcfunctional': ['bh','pbe','pw92','revpbe'],
                 'model': 'None',
                 'mixing' : False,

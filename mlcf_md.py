@@ -84,7 +84,7 @@ if __name__ == '__main__':
     os.chdir(args.dir)
 
     workdir = args.startfile.split('.')[0] if args.integrator.lower() == 'list' else 'siesta'
-    workdir += '/'
+    workdir = calcdir + '/' + workdir + '/'
 
     os.environ['SIESTA_WORKING_DIR'] = workdir
     try:

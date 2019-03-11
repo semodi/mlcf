@@ -72,8 +72,7 @@ class Siesta_Calculator(Siesta):
                           'DM.NumberPulay': 3,
                           'ElectronicTemperature': 5e-3,
                           'WriteMullikenPop': 0,
-                          'MaxSCFIterations': 20,
-                          'SaveRhoXC': 'True'}
+                          'MaxSCFIterations': 40}
 
         if basis == 'uf':
             super().__init__(label=label,
@@ -89,7 +88,7 @@ class Siesta_Calculator(Siesta):
                mesh_cutoff=200 * Ry,
                energy_shift=0.02 * Ry,
                basis_set = basis.upper())
-            dmtol = 1e-4
+            dmtol = 5e-4
         else:
             species_o = Species(symbol= 'O',
              basis_set = PAOBasisBlock(basis_sets['o_basis_{}'.format(basis)]))
@@ -102,13 +101,19 @@ class Siesta_Calculator(Siesta):
                basis_set = 'DZP',
                species=[species_o, species_h],
                energy_shift=0.02 * Ry)
-            dmtol = 1e-4
+            dmtol = 5e-4
 
         fdf_arguments['DM.UseSaveDM'] = 'True'
+        fdf_arguments['SCF.MustConverge'] = 'False'
         fdf_arguments['DM.Tolerance'] = dmtol
+        fdf_arguments['MLCF.Use'] = False
+        fdf_arguments['SaveDeltaRho'] = True
 
         allowed_keys = self.allowed_fdf_keywords
+        allowed_keys['SaveDeltaRho'] = False
         allowed_keys['SaveRhoXC'] = False
+        allowed_keys['MLCF.Use'] = False
+        allowed_keys['SCF.MustConverge'] = False
         self.allowed_keywords = allowed_keys
         self.set_fdf_arguments(fdf_arguments)
 
