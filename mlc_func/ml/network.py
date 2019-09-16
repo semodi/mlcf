@@ -109,6 +109,22 @@ class Energy_Network():
 
         return logits
 
+    def sample_training(self, percentage):
+
+
+        for subnet in self.subnets:
+            n_samples = len(subnet[0].y_train)
+            n_select = np.ceil(percentage*n_samples).astype(int)
+            if n_select < 2: n_select = 2
+            selection = np.arange(n_samples).astype(int)
+            np.random.shuffle(selection)
+            selection = selection[:n_select]
+            for s in subnet:
+                s.X_train = s.X_train[:,selection]
+                s.y_train = s.y_train[selection]
+
+
+
     def get_feed(self, which = 'train', train_valid_split = 0.8, seed = 42):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
