@@ -1,5 +1,7 @@
 [![Build Status](https://travis-ci.org/semodi/mlcf.svg?branch=master)](https://travis-ci.org/semodi/mlcf)
 [![Documentation Status](https://readthedocs.org/projects/mlcf/badge/?version=latest)](https://mlcf.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/152336465.svg)](https://zenodo.org/badge/latestdoi/152336465)
+
 
 <img src="https://github.com/semodi/mlcf/blob/master/model.png" width="400" height="210" />
 
