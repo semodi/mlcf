@@ -86,14 +86,12 @@ def test_siesta():
 
     energy = siesta.get_energy('./test/0.out')
     forces = siesta.get_forces('./test/0.out')
-    atoms = siesta.get_atoms('./test/0.out')
 
     # pickle.dump({'energy': energy, 'forces': forces, 'atoms': atoms},
      # open('./test/siesta_test.pckl','wb'))
     ref = pickle.load(open('./test/siesta_test.pckl','rb'))
     assert energy == ref['energy']
     assert np.allclose(forces,ref['forces'])
-    assert atoms == ref['atoms']
 
 def test_rs_elf():
     """Test if the basic function get_elfs() works
