@@ -28,7 +28,8 @@ install:
   - conda install pytest-cov
   - conda install pytest
   - conda install tensorflow
-  - conda install -c moble spherical_functions
+  - pip install git+git://github.com/moble/quaternion
+  - pip install git+git://github.com/moble/spherical_functions
   - conda list
 
 before_script:
