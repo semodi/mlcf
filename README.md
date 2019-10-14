@@ -35,6 +35,12 @@ pip install -e .
 ```
 In this case `sphercial_functions` need not be installed separately
 
+## Scitation
+
+If you use this code in your work, please cite it as 
+
+Dick, Sebastian, and Marivi Fernandez-Serra. "Learning from the density to correct total energy and forces in first principle simulations." The Journal of Chemical Physics 151.14 (2019): 144102.
+
 ## Modules
 
 `mlc_func` is divided into three submodules:
