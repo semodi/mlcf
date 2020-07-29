@@ -35,7 +35,7 @@ pip install -e .
 ```
 In this case `sphercial_functions` need not be installed separately
 
-## Scitation
+## Citation
 
 If you use this code in your work, please cite it as 
 
